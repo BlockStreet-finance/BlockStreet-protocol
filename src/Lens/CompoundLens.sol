@@ -5,18 +5,12 @@ import "../CErc20.sol";
 import "../CToken.sol";
 import "../PriceOracle.sol";
 import "../EIP20Interface.sol";
-import "../Governance/Comp.sol";
 
 interface ComptrollerLensInterface {
     function markets(address) external view returns (bool, uint);
     function oracle() external view returns (PriceOracle);
     function getAccountLiquidity(address) external view returns (uint, uint, uint);
     function getAssetsIn(address) external view returns (CToken[] memory);
-    function claimComp(address) external;
-    function compAccrued(address) external view returns (uint);
-    function compSpeeds(address) external view returns (uint);
-    function compSupplySpeeds(address) external view returns (uint);
-    function compBorrowSpeeds(address) external view returns (uint);
     function borrowCaps(address) external view returns (uint);
 }
 
@@ -59,54 +53,9 @@ contract CompoundLens {
         address underlyingAssetAddress;
         uint cTokenDecimals;
         uint underlyingDecimals;
-        uint compSupplySpeed;
-        uint compBorrowSpeed;
         uint borrowCap;
     }
 
-    function getCompSpeeds(ComptrollerLensInterface comptroller, CToken cToken) internal returns (uint, uint) {
-        // Getting comp speeds is gnarly due to not every network having the
-        // split comp speeds from Proposal 62 and other networks don't even
-        // have comp speeds.
-        uint compSupplySpeed = 0;
-        (bool compSupplySpeedSuccess, bytes memory compSupplySpeedReturnData) =
-            address(comptroller).call(
-                abi.encodePacked(
-                    comptroller.compSupplySpeeds.selector,
-                    abi.encode(address(cToken))
-                )
-            );
-        if (compSupplySpeedSuccess) {
-            compSupplySpeed = abi.decode(compSupplySpeedReturnData, (uint));
-        }
-
-        uint compBorrowSpeed = 0;
-        (bool compBorrowSpeedSuccess, bytes memory compBorrowSpeedReturnData) =
-            address(comptroller).call(
-                abi.encodePacked(
-                    comptroller.compBorrowSpeeds.selector,
-                    abi.encode(address(cToken))
-                )
-            );
-        if (compBorrowSpeedSuccess) {
-            compBorrowSpeed = abi.decode(compBorrowSpeedReturnData, (uint));
-        }
-
-        // If the split comp speeds call doesn't work, try the  oldest non-spit version.
-        if (!compSupplySpeedSuccess || !compBorrowSpeedSuccess) {
-            (bool compSpeedSuccess, bytes memory compSpeedReturnData) =
-            address(comptroller).call(
-                abi.encodePacked(
-                    comptroller.compSpeeds.selector,
-                    abi.encode(address(cToken))
-                )
-            );
-            if (compSpeedSuccess) {
-                compSupplySpeed = compBorrowSpeed = abi.decode(compSpeedReturnData, (uint));
-            }
-        }
-        return (compSupplySpeed, compBorrowSpeed);
-    }
 
     function cTokenMetadata(CToken cToken) public returns (CTokenMetadata memory) {
         uint exchangeRateCurrent = cToken.exchangeRateCurrent();
@@ -123,8 +72,6 @@ contract CompoundLens {
             underlyingAssetAddress = cErc20.underlying();
             underlyingDecimals = EIP20Interface(cErc20.underlying()).decimals();
         }
-
-        (uint compSupplySpeed, uint compBorrowSpeed) = getCompSpeeds(comptroller, cToken);
 
         uint borrowCap = 0;
         (bool borrowCapSuccess, bytes memory borrowCapReturnData) =
@@ -153,8 +100,6 @@ contract CompoundLens {
             underlyingAssetAddress: underlyingAssetAddress,
             cTokenDecimals: cToken.decimals(),
             underlyingDecimals: underlyingDecimals,
-            compSupplySpeed: compSupplySpeed,
-            compBorrowSpeed: compBorrowSpeed,
             borrowCap: borrowCap
         });
     }
