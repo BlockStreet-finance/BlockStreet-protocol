@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.10;
 
-import "../CErc20.sol";
-import "../CToken.sol";
+import "../BErc20.sol";
+import "../BToken.sol";
 import "../PriceOracle.sol";
 import "../EIP20Interface.sol";
 
-interface ComptrollerLensInterface {
+interface BlotrollerLensInterface {
     function markets(address) external view returns (bool, uint);
     function oracle() external view returns (PriceOracle);
     function getAccountLiquidity(address) external view returns (uint, uint, uint);
-    function getAssetsIn(address) external view returns (CToken[] memory);
+    function getAssetsIn(address) external view returns (BToken[] memory);
     function borrowCaps(address) external view returns (uint);
 }
 
@@ -37,9 +37,9 @@ interface GovernorBravoInterface {
     function getReceipt(uint proposalId, address voter) external view returns (Receipt memory);
 }
 
-contract CompoundLens {
-    struct CTokenMetadata {
-        address cToken;
+contract BlockStreetLens {
+    struct BTokenMetadata {
+        address bToken;
         uint exchangeRateCurrent;
         uint supplyRatePerBlock;
         uint borrowRatePerBlock;
@@ -51,26 +51,26 @@ contract CompoundLens {
         bool isListed;
         uint collateralFactorMantissa;
         address underlyingAssetAddress;
-        uint cTokenDecimals;
+        uint bTokenDecimals;
         uint underlyingDecimals;
         uint borrowCap;
     }
 
 
-    function cTokenMetadata(CToken cToken) public returns (CTokenMetadata memory) {
-        uint exchangeRateCurrent = cToken.exchangeRateCurrent();
-        ComptrollerLensInterface comptroller = ComptrollerLensInterface(address(cToken.comptroller()));
-        (bool isListed, uint collateralFactorMantissa) = comptroller.markets(address(cToken));
+    function bTokenMetadata(BToken bToken) public returns (BTokenMetadata memory) {
+        uint exchangeRateCurrent = bToken.exchangeRateCurrent();
+        BlotrollerLensInterface comptroller = BlotrollerLensInterface(address(bToken.comptroller()));
+        (bool isListed, uint collateralFactorMantissa) = comptroller.markets(address(bToken));
         address underlyingAssetAddress;
         uint underlyingDecimals;
 
-        if (compareStrings(cToken.symbol(), "cETH")) {
+        if (compareStrings(bToken.symbol(), "bETH")) {
             underlyingAssetAddress = address(0);
             underlyingDecimals = 18;
         } else {
-            CErc20 cErc20 = CErc20(address(cToken));
-            underlyingAssetAddress = cErc20.underlying();
-            underlyingDecimals = EIP20Interface(cErc20.underlying()).decimals();
+            BErc20 bErc20 = BErc20(address(bToken));
+            underlyingAssetAddress = bErc20.underlying();
+            underlyingDecimals = EIP20Interface(bErc20.underlying()).decimals();
         }
 
         uint borrowCap = 0;
@@ -78,43 +78,43 @@ contract CompoundLens {
             address(comptroller).call(
                 abi.encodePacked(
                     comptroller.borrowCaps.selector,
-                    abi.encode(address(cToken))
+                    abi.encode(address(bToken))
                 )
             );
         if (borrowCapSuccess) {
             borrowCap = abi.decode(borrowCapReturnData, (uint));
         }
 
-        return CTokenMetadata({
-            cToken: address(cToken),
+        return BTokenMetadata({
+            bToken: address(bToken),
             exchangeRateCurrent: exchangeRateCurrent,
-            supplyRatePerBlock: cToken.supplyRatePerBlock(),
-            borrowRatePerBlock: cToken.borrowRatePerBlock(),
-            reserveFactorMantissa: cToken.reserveFactorMantissa(),
-            totalBorrows: cToken.totalBorrows(),
-            totalReserves: cToken.totalReserves(),
-            totalSupply: cToken.totalSupply(),
-            totalCash: cToken.getCash(),
+            supplyRatePerBlock: bToken.supplyRatePerBlock(),
+            borrowRatePerBlock: bToken.borrowRatePerBlock(),
+            reserveFactorMantissa: bToken.reserveFactorMantissa(),
+            totalBorrows: bToken.totalBorrows(),
+            totalReserves: bToken.totalReserves(),
+            totalSupply: bToken.totalSupply(),
+            totalCash: bToken.getCash(),
             isListed: isListed,
             collateralFactorMantissa: collateralFactorMantissa,
             underlyingAssetAddress: underlyingAssetAddress,
-            cTokenDecimals: cToken.decimals(),
+            bTokenDecimals: bToken.decimals(),
             underlyingDecimals: underlyingDecimals,
             borrowCap: borrowCap
         });
     }
 
-    function cTokenMetadataAll(CToken[] calldata cTokens) external returns (CTokenMetadata[] memory) {
-        uint cTokenCount = cTokens.length;
-        CTokenMetadata[] memory res = new CTokenMetadata[](cTokenCount);
-        for (uint i = 0; i < cTokenCount; i++) {
-            res[i] = cTokenMetadata(cTokens[i]);
+    function bTokenMetadataAll(BToken[] calldata bTokens) external returns (BTokenMetadata[] memory) {
+        uint bTokenCount = bTokens.length;
+        BTokenMetadata[] memory res = new BTokenMetadata[](bTokenCount);
+        for (uint i = 0; i < bTokenCount; i++) {
+            res[i] = bTokenMetadata(bTokens[i]);
         }
         return res;
     }
 
-    struct CTokenBalances {
-        address cToken;
+    struct BTokenBalances {
+        address bToken;
         uint balanceOf;
         uint borrowBalanceCurrent;
         uint balanceOfUnderlying;
@@ -122,25 +122,25 @@ contract CompoundLens {
         uint tokenAllowance;
     }
 
-    function cTokenBalances(CToken cToken, address payable account) public returns (CTokenBalances memory) {
-        uint balanceOf = cToken.balanceOf(account);
-        uint borrowBalanceCurrent = cToken.borrowBalanceCurrent(account);
-        uint balanceOfUnderlying = cToken.balanceOfUnderlying(account);
+    function bTokenBalances(BToken bToken, address payable account) public returns (BTokenBalances memory) {
+        uint balanceOf = bToken.balanceOf(account);
+        uint borrowBalanceCurrent = bToken.borrowBalanceCurrent(account);
+        uint balanceOfUnderlying = bToken.balanceOfUnderlying(account);
         uint tokenBalance;
         uint tokenAllowance;
 
-        if (compareStrings(cToken.symbol(), "cETH")) {
+        if (compareStrings(bToken.symbol(), "bETH")) {
             tokenBalance = account.balance;
             tokenAllowance = account.balance;
         } else {
-            CErc20 cErc20 = CErc20(address(cToken));
-            EIP20Interface underlying = EIP20Interface(cErc20.underlying());
+            BErc20 bErc20 = BErc20(address(bToken));
+            EIP20Interface underlying = EIP20Interface(bErc20.underlying());
             tokenBalance = underlying.balanceOf(account);
-            tokenAllowance = underlying.allowance(account, address(cToken));
+            tokenAllowance = underlying.allowance(account, address(bToken));
         }
 
-        return CTokenBalances({
-            cToken: address(cToken),
+        return BTokenBalances({
+            bToken: address(bToken),
             balanceOf: balanceOf,
             borrowBalanceCurrent: borrowBalanceCurrent,
             balanceOfUnderlying: balanceOfUnderlying,
@@ -149,46 +149,46 @@ contract CompoundLens {
         });
     }
 
-    function cTokenBalancesAll(CToken[] calldata cTokens, address payable account) external returns (CTokenBalances[] memory) {
-        uint cTokenCount = cTokens.length;
-        CTokenBalances[] memory res = new CTokenBalances[](cTokenCount);
-        for (uint i = 0; i < cTokenCount; i++) {
-            res[i] = cTokenBalances(cTokens[i], account);
+    function bTokenBalancesAll(BToken[] calldata bTokens, address payable account) external returns (BTokenBalances[] memory) {
+        uint bTokenCount = bTokens.length;
+        BTokenBalances[] memory res = new BTokenBalances[](bTokenCount);
+        for (uint i = 0; i < bTokenCount; i++) {
+            res[i] = bTokenBalances(bTokens[i], account);
         }
         return res;
     }
 
-    struct CTokenUnderlyingPrice {
-        address cToken;
+    struct BTokenUnderlyingPrice {
+        address bToken;
         uint underlyingPrice;
     }
 
-    function cTokenUnderlyingPrice(CToken cToken) public returns (CTokenUnderlyingPrice memory) {
-        ComptrollerLensInterface comptroller = ComptrollerLensInterface(address(cToken.comptroller()));
+    function bTokenUnderlyingPrice(BToken bToken) public returns (BTokenUnderlyingPrice memory) {
+        BlotrollerLensInterface comptroller = BlotrollerLensInterface(address(bToken.comptroller()));
         PriceOracle priceOracle = comptroller.oracle();
 
-        return CTokenUnderlyingPrice({
-            cToken: address(cToken),
-            underlyingPrice: priceOracle.getUnderlyingPrice(cToken)
+        return BTokenUnderlyingPrice({
+            bToken: address(bToken),
+            underlyingPrice: priceOracle.getUnderlyingPrice(bToken)
         });
     }
 
-    function cTokenUnderlyingPriceAll(CToken[] calldata cTokens) external returns (CTokenUnderlyingPrice[] memory) {
-        uint cTokenCount = cTokens.length;
-        CTokenUnderlyingPrice[] memory res = new CTokenUnderlyingPrice[](cTokenCount);
-        for (uint i = 0; i < cTokenCount; i++) {
-            res[i] = cTokenUnderlyingPrice(cTokens[i]);
+    function bTokenUnderlyingPriceAll(BToken[] calldata bTokens) external returns (BTokenUnderlyingPrice[] memory) {
+        uint bTokenCount = bTokens.length;
+        BTokenUnderlyingPrice[] memory res = new BTokenUnderlyingPrice[](bTokenCount);
+        for (uint i = 0; i < bTokenCount; i++) {
+            res[i] = bTokenUnderlyingPrice(bTokens[i]);
         }
         return res;
     }
 
     struct AccountLimits {
-        CToken[] markets;
+        BToken[] markets;
         uint liquidity;
         uint shortfall;
     }
 
-    function getAccountLimits(ComptrollerLensInterface comptroller, address account) public view returns (AccountLimits memory) {
+    function getAccountLimits(BlotrollerLensInterface comptroller, address account) public view returns (AccountLimits memory) {
         (uint errorCode, uint liquidity, uint shortfall) = comptroller.getAccountLiquidity(account);
         require(errorCode == 0);
 

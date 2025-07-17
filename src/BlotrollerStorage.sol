@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.10;
 
-import "./CToken.sol";
+import "./BToken.sol";
 import "./PriceOracle.sol";
 
 contract UnitrollerAdminStorage {
@@ -23,10 +23,10 @@ contract UnitrollerAdminStorage {
     /**
     * @notice Pending brains of Unitroller
     */
-    address public pendingComptrollerImplementation;
+    address public pendingBlotrollerImplementation;
 }
 
-contract ComptrollerV1Storage is UnitrollerAdminStorage {
+contract BlotrollerV1Storage is UnitrollerAdminStorage {
 
     /**
      * @notice Oracle which gives the price of any given asset
@@ -51,11 +51,11 @@ contract ComptrollerV1Storage is UnitrollerAdminStorage {
     /**
      * @notice Per-account mapping of "assets you are in", capped by maxAssets
      */
-    mapping(address => CToken[]) public accountAssets;
+    mapping(address => BToken[]) public accountAssets;
 
 }
 
-contract ComptrollerV2Storage is ComptrollerV1Storage {
+contract BlotrollerV2Storage is BlotrollerV1Storage {
     struct Market {
         // Whether or not this market is listed
         bool isListed;
@@ -71,7 +71,7 @@ contract ComptrollerV2Storage is ComptrollerV1Storage {
     }
 
     /**
-     * @notice Official mapping of cTokens -> Market metadata
+     * @notice Official mapping of bTokens -> Market metadata
      * @dev Used e.g. to determine if a market is supported
      */
     mapping(address => Market) public markets;
@@ -91,24 +91,24 @@ contract ComptrollerV2Storage is ComptrollerV1Storage {
     mapping(address => bool) public borrowGuardianPaused;
 }
 
-contract ComptrollerV3Storage is ComptrollerV2Storage {
+contract BlotrollerV3Storage is BlotrollerV2Storage {
     /// @notice A list of all markets
-    CToken[] public allMarkets;
+    BToken[] public allMarkets;
 }
 
-contract ComptrollerV4Storage is ComptrollerV3Storage {
+contract BlotrollerV4Storage is BlotrollerV3Storage {
     // @notice The borrowCapGuardian can set borrowCaps to any number for any market. Lowering the borrow cap could disable borrowing on the given market.
     address public borrowCapGuardian;
 
-    // @notice Borrow caps enforced by borrowAllowed for each cToken address. Defaults to zero which corresponds to unlimited borrowing.
+    // @notice Borrow caps enforced by borrowAllowed for each bToken address. Defaults to zero which corresponds to unlimited borrowing.
     mapping(address => uint) public borrowCaps;
 }
 
-contract ComptrollerV5Storage is ComptrollerV4Storage {
+contract BlotrollerV5Storage is BlotrollerV4Storage {
 }
 
-contract ComptrollerV6Storage is ComptrollerV5Storage {
+contract BlotrollerV6Storage is BlotrollerV5Storage {
 }
 
-contract ComptrollerV7Storage is ComptrollerV6Storage {
+contract BlotrollerV7Storage is BlotrollerV6Storage {
 }

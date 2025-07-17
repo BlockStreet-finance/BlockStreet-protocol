@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.10;
 
-import "./CErc20.sol";
+import "./BErc20.sol";
 
 /**
- * @title Compound's CErc20Immutable Contract
- * @notice CTokens which wrap an EIP-20 underlying and are immutable
- * @author Compound
+ * @title BlockStreet's BErc20Immutable Contract
+ * @notice BTokens which wrap an EIP-20 underlying and are immutable
+ * @author BlockStreet
  */
-contract CErc20Immutable is CErc20 {
+contract BErc20Immutable is BErc20 {
     /**
      * @notice Construct a new money market
      * @param underlying_ The address of the underlying asset
@@ -21,7 +21,7 @@ contract CErc20Immutable is CErc20 {
      * @param admin_ Address of the administrator of this token
      */
     constructor(address underlying_,
-                ComptrollerInterface comptroller_,
+                BlotrollerInterface comptroller_,
                 InterestRateModel interestRateModel_,
                 uint initialExchangeRateMantissa_,
                 string memory name_,
