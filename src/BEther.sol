@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.10;
 
-import "./CToken.sol";
+import "./BToken.sol";
 
 /**
- * @title Compound's CEther Contract
- * @notice CToken which wraps Ether
- * @author Compound
+ * @title BlockStreet's BEther Contract
+ * @notice BToken which wraps Ether
+ * @author BlockStreet
  */
-contract CEther is CToken {
+contract BEther is BToken {
     /**
-     * @notice Construct a new CEther money market
+     * @notice Construct a new BEther money market
      * @param comptroller_ The address of the Comptroller
      * @param interestRateModel_ The address of the interest rate model
      * @param initialExchangeRateMantissa_ The initial exchange rate, scaled by 1e18
@@ -19,7 +19,7 @@ contract CEther is CToken {
      * @param decimals_ ERC-20 decimal precision of this token
      * @param admin_ Address of the administrator of this token
      */
-    constructor(ComptrollerInterface comptroller_,
+    constructor(BlotrollerInterface comptroller_,
                 InterestRateModel interestRateModel_,
                 uint initialExchangeRateMantissa_,
                 string memory name_,
@@ -39,7 +39,7 @@ contract CEther is CToken {
     /*** User Interface ***/
 
     /**
-     * @notice Sender supplies assets into the market and receives cTokens in exchange
+     * @notice Sender supplies assets into the market and receives bTokens in exchange
      * @dev Reverts upon any failure
      */
     function mint() external payable {
@@ -47,9 +47,9 @@ contract CEther is CToken {
     }
 
     /**
-     * @notice Sender redeems cTokens in exchange for the underlying asset
+     * @notice Sender redeems bTokens in exchange for the underlying asset
      * @dev Accrues interest whether or not the operation succeeds, unless reverted
-     * @param redeemTokens The number of cTokens to redeem into underlying
+     * @param redeemTokens The number of bTokens to redeem into underlying
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function redeem(uint redeemTokens) external returns (uint) {
@@ -58,7 +58,7 @@ contract CEther is CToken {
     }
 
     /**
-     * @notice Sender redeems cTokens in exchange for a specified amount of underlying asset
+     * @notice Sender redeems bTokens in exchange for a specified amount of underlying asset
      * @dev Accrues interest whether or not the operation succeeds, unless reverted
      * @param redeemAmount The amount of underlying to redeem
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
@@ -99,11 +99,11 @@ contract CEther is CToken {
      * @notice The sender liquidates the borrowers collateral.
      *  The collateral seized is transferred to the liquidator.
      * @dev Reverts upon any failure
-     * @param borrower The borrower of this cToken to be liquidated
-     * @param cTokenCollateral The market in which to seize collateral from the borrower
+     * @param borrower The borrower of this bToken to be liquidated
+     * @param bTokenCollateral The market in which to seize collateral from the borrower
      */
-    function liquidateBorrow(address borrower, CToken cTokenCollateral) external payable {
-        liquidateBorrowInternal(borrower, msg.value, cTokenCollateral);
+    function liquidateBorrow(address borrower, BToken bTokenCollateral) external payable {
+        liquidateBorrowInternal(borrower, msg.value, bTokenCollateral);
     }
 
     /**
@@ -115,7 +115,7 @@ contract CEther is CToken {
     }
 
     /**
-     * @notice Send Ether to CEther to mint
+     * @notice Send Ether to BEther to mint
      */
     receive() external payable {
         mintInternal(msg.value);

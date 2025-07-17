@@ -2,13 +2,13 @@
 pragma solidity ^0.8.10;
 
 import "./ErrorReporter.sol";
-import "./ComptrollerStorage.sol";
+import "./BlotrollerStorage.sol";
 /**
- * @title ComptrollerCore
+ * @title BlotrollerCore
  * @dev Storage for the comptroller is at this address, while execution is delegated to the `comptrollerImplementation`.
- * CTokens should reference this contract as their comptroller.
+ * BTokens should reference this contract as their comptroller.
  */
-contract Unitroller is UnitrollerAdminStorage, ComptrollerErrorReporter {
+contract Unitroller is UnitrollerAdminStorage, BlotrollerErrorReporter {
 
     /**
       * @notice Emitted when pendingComptrollerImplementation is changed
