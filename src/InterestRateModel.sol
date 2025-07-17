@@ -2,8 +2,8 @@
 pragma solidity ^0.8.10;
 
 /**
-  * @title Compound's InterestRateModel Interface
-  * @author Compound
+  * @title BlockStreet's InterestRateModel Interface
+  * @author BlockStreet
   */
 abstract contract InterestRateModel {
     /// @notice Indicator that this is an InterestRateModel contract (for inspection)

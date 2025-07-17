@@ -14,19 +14,19 @@ import "./Unitroller.sol";
  */
 contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerErrorReporter, ExponentialNoError {
     /// @notice Emitted when an admin supports a market
-    event MarketListed(BToken cToken);
+    event MarketListed(BToken bToken);
 
     /// @notice Emitted when an account enters a market
-    event MarketEntered(BToken cToken, address account);
+    event MarketEntered(BToken bToken, address account);
 
     /// @notice Emitted when an account exits a market
-    event MarketExited(BToken cToken, address account);
+    event MarketExited(BToken bToken, address account);
 
     /// @notice Emitted when close factor is changed by admin
     event NewCloseFactor(uint oldCloseFactorMantissa, uint newCloseFactorMantissa);
 
     /// @notice Emitted when a collateral factor is changed by admin
-    event NewCollateralFactor(BToken cToken, uint oldCollateralFactorMantissa, uint newCollateralFactorMantissa);
+    event NewCollateralFactor(BToken bToken, uint oldCollateralFactorMantissa, uint newCollateralFactorMantissa);
 
     /// @notice Emitted when liquidation incentive is changed by admin
     event NewLiquidationIncentive(uint oldLiquidationIncentiveMantissa, uint newLiquidationIncentiveMantissa);
@@ -41,11 +41,11 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
     event ActionPaused(string action, bool pauseState);
 
     /// @notice Emitted when an action is paused on a market
-    event ActionPaused(BToken cToken, string action, bool pauseState);
+    event ActionPaused(BToken bToken, string action, bool pauseState);
 
 
-    /// @notice Emitted when borrow cap for a cToken is changed
-    event NewBorrowCap(BToken indexed cToken, uint newBorrowCap);
+    /// @notice Emitted when borrow cap for a bToken is changed
+    event NewBorrowCap(BToken indexed bToken, uint newBorrowCap);
 
     /// @notice Emitted when borrow cap guardian is changed
     event NewBorrowCapGuardian(address oldBorrowCapGuardian, address newBorrowCapGuardian);
@@ -79,26 +79,26 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
     /**
      * @notice Returns whether the given account is entered in the given asset
      * @param account The address of the account to check
-     * @param cToken The cToken to check
+     * @param bToken The bToken to check
      * @return True if the account is in the asset, otherwise false.
      */
-    function checkMembership(address account, BToken cToken) external view returns (bool) {
-        return markets[address(cToken)].accountMembership[account];
+    function checkMembership(address account, BToken bToken) external view returns (bool) {
+        return markets[address(bToken)].accountMembership[account];
     }
 
     /**
      * @notice Add assets to be included in account liquidity calculation
-     * @param cTokens The list of addresses of the cToken markets to be enabled
+     * @param bTokens The list of addresses of the bToken markets to be enabled
      * @return Success indicator for whether each corresponding market was entered
      */
-    function enterMarkets(address[] memory cTokens) override public returns (uint[] memory) {
-        uint len = cTokens.length;
+    function enterMarkets(address[] memory bTokens) override public returns (uint[] memory) {
+        uint len = bTokens.length;
 
         uint[] memory results = new uint[](len);
         for (uint i = 0; i < len; i++) {
-            BToken cToken = BToken(cTokens[i]);
+            BToken bToken = BToken(bTokens[i]);
 
-            results[i] = uint(addToMarketInternal(cToken, msg.sender));
+            results[i] = uint(addToMarketInternal(bToken, msg.sender));
         }
 
         return results;
@@ -106,12 +106,12 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Add the market to the borrower's "assets in" for liquidity calculations
-     * @param cToken The market to enter
+     * @param bToken The market to enter
      * @param borrower The address of the account to modify
      * @return Success indicator for whether the market was entered
      */
-    function addToMarketInternal(BToken cToken, address borrower) internal returns (Error) {
-        Market storage marketToJoin = markets[address(cToken)];
+    function addToMarketInternal(BToken bToken, address borrower) internal returns (Error) {
+        Market storage marketToJoin = markets[address(bToken)];
 
         if (!marketToJoin.isListed) {
             // market is not listed, cannot join
@@ -129,9 +129,9 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         //  that is, only when we need to perform liquidity checks
         //  and not whenever we want to check if an account is in a particular market
         marketToJoin.accountMembership[borrower] = true;
-        accountAssets[borrower].push(cToken);
+        accountAssets[borrower].push(bToken);
 
-        emit MarketEntered(cToken, borrower);
+        emit MarketEntered(bToken, borrower);
 
         return Error.NO_ERROR;
     }
@@ -140,13 +140,13 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
      * @notice Removes asset from sender's account liquidity calculation
      * @dev Sender must not have an outstanding borrow balance in the asset,
      *  or be providing necessary collateral for an outstanding borrow.
-     * @param cTokenAddress The address of the asset to be removed
+     * @param bTokenAddress The address of the asset to be removed
      * @return Whether or not the account successfully exited the market
      */
-    function exitMarket(address cTokenAddress) override external returns (uint) {
-        BToken cToken = BToken(cTokenAddress);
-        /* Get sender tokensHeld and amountOwed underlying from the cToken */
-        (uint oErr, uint tokensHeld, uint amountOwed, ) = cToken.getAccountSnapshot(msg.sender);
+    function exitMarket(address bTokenAddress) override external returns (uint) {
+        BToken bToken = BToken(bTokenAddress);
+        /* Get sender tokensHeld and amountOwed underlying from the bToken */
+        (uint oErr, uint tokensHeld, uint amountOwed, ) = bToken.getAccountSnapshot(msg.sender);
         require(oErr == 0, "exitMarket: getAccountSnapshot failed"); // semi-opaque error code
 
         /* Fail if the sender has a borrow balance */
@@ -155,28 +155,28 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         }
 
         /* Fail if the sender is not permitted to redeem all of their tokens */
-        uint allowed = redeemAllowedInternal(cTokenAddress, msg.sender, tokensHeld);
+        uint allowed = redeemAllowedInternal(bTokenAddress, msg.sender, tokensHeld);
         if (allowed != 0) {
             return failOpaque(Error.REJECTION, FailureInfo.EXIT_MARKET_REJECTION, allowed);
         }
 
-        Market storage marketToExit = markets[address(cToken)];
+        Market storage marketToExit = markets[address(bToken)];
 
         /* Return true if the sender is not already ‘in’ the market */
         if (!marketToExit.accountMembership[msg.sender]) {
             return uint(Error.NO_ERROR);
         }
 
-        /* Set cToken account membership to false */
+        /* Set bToken account membership to false */
         delete marketToExit.accountMembership[msg.sender];
 
-        /* Delete cToken from the account’s list of assets */
+        /* Delete bToken from the account’s list of assets */
         // load into memory for faster iteration
         BToken[] memory userAssetList = accountAssets[msg.sender];
         uint len = userAssetList.length;
         uint assetIndex = len;
         for (uint i = 0; i < len; i++) {
-            if (userAssetList[i] == cToken) {
+            if (userAssetList[i] == bToken) {
                 assetIndex = i;
                 break;
             }
@@ -190,7 +190,7 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         storedList[assetIndex] = storedList[storedList.length - 1];
         storedList.pop();
 
-        emit MarketExited(cToken, msg.sender);
+        emit MarketExited(bToken, msg.sender);
 
         return uint(Error.NO_ERROR);
     }
@@ -199,20 +199,20 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Checks if the account should be allowed to mint tokens in the given market
-     * @param cToken The market to verify the mint against
+     * @param bToken The market to verify the mint against
      * @param minter The account which would get the minted tokens
      * @param mintAmount The amount of underlying being supplied to the market in exchange for tokens
      * @return 0 if the mint is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
-    function mintAllowed(address cToken, address minter, uint mintAmount) override external returns (uint) {
+    function mintAllowed(address bToken, address minter, uint mintAmount) override external returns (uint) {
         // Pausing is a very serious situation - we revert to sound the alarms
-        require(!mintGuardianPaused[cToken], "mint is paused");
+        require(!mintGuardianPaused[bToken], "mint is paused");
 
         // Shh - currently unused
         minter;
         mintAmount;
 
-        if (!markets[cToken].isListed) {
+        if (!markets[bToken].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
         }
 
@@ -223,14 +223,14 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Validates mint and reverts on rejection. May emit logs.
-     * @param cToken Asset being minted
+     * @param bToken Asset being minted
      * @param minter The address minting the tokens
      * @param actualMintAmount The amount of the underlying asset being minted
      * @param mintTokens The number of tokens being minted
      */
-    function mintVerify(address cToken, address minter, uint actualMintAmount, uint mintTokens) override external {
+    function mintVerify(address bToken, address minter, uint actualMintAmount, uint mintTokens) override external {
         // Shh - currently unused
-        cToken;
+        bToken;
         minter;
         actualMintAmount;
         mintTokens;
@@ -243,13 +243,13 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Checks if the account should be allowed to redeem tokens in the given market
-     * @param cToken The market to verify the redeem against
+     * @param bToken The market to verify the redeem against
      * @param redeemer The account which would redeem the tokens
-     * @param redeemTokens The number of cTokens to exchange for the underlying asset in the market
+     * @param redeemTokens The number of bTokens to exchange for the underlying asset in the market
      * @return 0 if the redeem is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
-    function redeemAllowed(address cToken, address redeemer, uint redeemTokens) override external returns (uint) {
-        uint allowed = redeemAllowedInternal(cToken, redeemer, redeemTokens);
+    function redeemAllowed(address bToken, address redeemer, uint redeemTokens) override external returns (uint) {
+        uint allowed = redeemAllowedInternal(bToken, redeemer, redeemTokens);
         if (allowed != uint(Error.NO_ERROR)) {
             return allowed;
         }
@@ -259,18 +259,18 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         return uint(Error.NO_ERROR);
     }
 
-    function redeemAllowedInternal(address cToken, address redeemer, uint redeemTokens) internal view returns (uint) {
-        if (!markets[cToken].isListed) {
+    function redeemAllowedInternal(address bToken, address redeemer, uint redeemTokens) internal view returns (uint) {
+        if (!markets[bToken].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
         }
 
         /* If the redeemer is not 'in' the market, then we can bypass the liquidity check */
-        if (!markets[cToken].accountMembership[redeemer]) {
+        if (!markets[bToken].accountMembership[redeemer]) {
             return uint(Error.NO_ERROR);
         }
 
         /* Otherwise, perform a hypothetical liquidity check to guard against shortfall */
-        (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(redeemer, BToken(cToken), redeemTokens, 0);
+        (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(redeemer, BToken(bToken), redeemTokens, 0);
         if (err != Error.NO_ERROR) {
             return uint(err);
         }
@@ -283,14 +283,14 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Validates redeem and reverts on rejection. May emit logs.
-     * @param cToken Asset being redeemed
+     * @param bToken Asset being redeemed
      * @param redeemer The address redeeming the tokens
      * @param redeemAmount The amount of the underlying asset being redeemed
      * @param redeemTokens The number of tokens being redeemed
      */
-    function redeemVerify(address cToken, address redeemer, uint redeemAmount, uint redeemTokens) override external {
+    function redeemVerify(address bToken, address redeemer, uint redeemAmount, uint redeemTokens) override external {
         // Shh - currently unused
-        cToken;
+        bToken;
         redeemer;
 
         // Require tokens is zero or amount is also zero
@@ -301,22 +301,22 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Checks if the account should be allowed to borrow the underlying asset of the given market
-     * @param cToken The market to verify the borrow against
+     * @param bToken The market to verify the borrow against
      * @param borrower The account which would borrow the asset
      * @param borrowAmount The amount of underlying the account would borrow
      * @return 0 if the borrow is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
-    function borrowAllowed(address cToken, address borrower, uint borrowAmount) override external returns (uint) {
+    function borrowAllowed(address bToken, address borrower, uint borrowAmount) override external returns (uint) {
         // Pausing is a very serious situation - we revert to sound the alarms
-        require(!borrowGuardianPaused[cToken], "borrow is paused");
+        require(!borrowGuardianPaused[bToken], "borrow is paused");
 
-        if (!markets[cToken].isListed) {
+        if (!markets[bToken].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
         }
 
-        if (!markets[cToken].accountMembership[borrower]) {
-            // only cTokens may call borrowAllowed if borrower not in market
-            require(msg.sender == cToken, "sender must be cToken");
+        if (!markets[bToken].accountMembership[borrower]) {
+            // only bTokens may call borrowAllowed if borrower not in market
+            require(msg.sender == bToken, "sender must be bToken");
 
             // attempt to add borrower to the market
             Error err = addToMarketInternal(BToken(msg.sender), borrower);
@@ -325,23 +325,23 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
             }
 
             // it should be impossible to break the important invariant
-            assert(markets[cToken].accountMembership[borrower]);
+            assert(markets[bToken].accountMembership[borrower]);
         }
 
-        if (oracle.getUnderlyingPrice(BToken(cToken)) == 0) {
+        if (oracle.getUnderlyingPrice(BToken(bToken)) == 0) {
             return uint(Error.PRICE_ERROR);
         }
 
 
-        uint borrowCap = borrowCaps[cToken];
+        uint borrowCap = borrowCaps[bToken];
         // Borrow cap of 0 corresponds to unlimited borrowing
         if (borrowCap != 0) {
-            uint totalBorrows = BToken(cToken).totalBorrows();
+            uint totalBorrows = BToken(bToken).totalBorrows();
             uint nextTotalBorrows = add_(totalBorrows, borrowAmount);
             require(nextTotalBorrows < borrowCap, "market borrow cap reached");
         }
 
-        (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(borrower, BToken(cToken), 0, borrowAmount);
+        (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(borrower, BToken(bToken), 0, borrowAmount);
         if (err != Error.NO_ERROR) {
             return uint(err);
         }
@@ -356,13 +356,13 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Validates borrow and reverts on rejection. May emit logs.
-     * @param cToken Asset whose underlying is being borrowed
+     * @param bToken Asset whose underlying is being borrowed
      * @param borrower The address borrowing the underlying
      * @param borrowAmount The amount of the underlying asset requested to borrow
      */
-    function borrowVerify(address cToken, address borrower, uint borrowAmount) override external {
+    function borrowVerify(address bToken, address borrower, uint borrowAmount) override external {
         // Shh - currently unused
-        cToken;
+        bToken;
         borrower;
         borrowAmount;
 
@@ -374,14 +374,14 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Checks if the account should be allowed to repay a borrow in the given market
-     * @param cToken The market to verify the repay against
+     * @param bToken The market to verify the repay against
      * @param payer The account which would repay the asset
      * @param borrower The account which would borrowed the asset
      * @param repayAmount The amount of the underlying asset the account would repay
      * @return 0 if the repay is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
     function repayBorrowAllowed(
-        address cToken,
+        address bToken,
         address payer,
         address borrower,
         uint repayAmount) override external returns (uint) {
@@ -390,7 +390,7 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         borrower;
         repayAmount;
 
-        if (!markets[cToken].isListed) {
+        if (!markets[bToken].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
         }
 
@@ -401,19 +401,19 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Validates repayBorrow and reverts on rejection. May emit logs.
-     * @param cToken Asset being repaid
+     * @param bToken Asset being repaid
      * @param payer The address repaying the borrow
      * @param borrower The address of the borrower
      * @param actualRepayAmount The amount of underlying being repaid
      */
     function repayBorrowVerify(
-        address cToken,
+        address bToken,
         address payer,
         address borrower,
         uint actualRepayAmount,
         uint borrowerIndex) override external {
         // Shh - currently unused
-        cToken;
+        bToken;
         payer;
         borrower;
         actualRepayAmount;
@@ -427,29 +427,29 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Checks if the liquidation should be allowed to occur
-     * @param cTokenBorrowed Asset which was borrowed by the borrower
-     * @param cTokenCollateral Asset which was used as collateral and will be seized
+     * @param bTokenBorrowed Asset which was borrowed by the borrower
+     * @param bTokenCollateral Asset which was used as collateral and will be seized
      * @param liquidator The address repaying the borrow and seizing the collateral
      * @param borrower The address of the borrower
      * @param repayAmount The amount of underlying being repaid
      */
     function liquidateBorrowAllowed(
-        address cTokenBorrowed,
-        address cTokenCollateral,
+        address bTokenBorrowed,
+        address bTokenCollateral,
         address liquidator,
         address borrower,
         uint repayAmount) override external returns (uint) {
         // Shh - currently unused
         liquidator;
 
-        if (!markets[cTokenBorrowed].isListed || !markets[cTokenCollateral].isListed) {
+        if (!markets[bTokenBorrowed].isListed || !markets[bTokenCollateral].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
         }
 
-        uint borrowBalance = BToken(cTokenBorrowed).borrowBalanceStored(borrower);
+        uint borrowBalance = BToken(bTokenBorrowed).borrowBalanceStored(borrower);
 
         /* allow accounts to be liquidated if the market is deprecated */
-        if (isDeprecated(BToken(cTokenBorrowed))) {
+        if (isDeprecated(BToken(bTokenBorrowed))) {
             require(borrowBalance >= repayAmount, "Can not repay more than the total borrow");
         } else {
             /* The borrower must have shortfall in order to be liquidatable */
@@ -473,22 +473,22 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Validates liquidateBorrow and reverts on rejection. May emit logs.
-     * @param cTokenBorrowed Asset which was borrowed by the borrower
-     * @param cTokenCollateral Asset which was used as collateral and will be seized
+     * @param bTokenBorrowed Asset which was borrowed by the borrower
+     * @param bTokenCollateral Asset which was used as collateral and will be seized
      * @param liquidator The address repaying the borrow and seizing the collateral
      * @param borrower The address of the borrower
      * @param actualRepayAmount The amount of underlying being repaid
      */
     function liquidateBorrowVerify(
-        address cTokenBorrowed,
-        address cTokenCollateral,
+        address bTokenBorrowed,
+        address bTokenCollateral,
         address liquidator,
         address borrower,
         uint actualRepayAmount,
         uint seizeTokens) override external {
         // Shh - currently unused
-        cTokenBorrowed;
-        cTokenCollateral;
+        bTokenBorrowed;
+        bTokenCollateral;
         liquidator;
         borrower;
         actualRepayAmount;
@@ -502,15 +502,15 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Checks if the seizing of assets should be allowed to occur
-     * @param cTokenCollateral Asset which was used as collateral and will be seized
-     * @param cTokenBorrowed Asset which was borrowed by the borrower
+     * @param bTokenCollateral Asset which was used as collateral and will be seized
+     * @param bTokenBorrowed Asset which was borrowed by the borrower
      * @param liquidator The address repaying the borrow and seizing the collateral
      * @param borrower The address of the borrower
      * @param seizeTokens The number of collateral tokens to seize
      */
     function seizeAllowed(
-        address cTokenCollateral,
-        address cTokenBorrowed,
+        address bTokenCollateral,
+        address bTokenBorrowed,
         address liquidator,
         address borrower,
         uint seizeTokens) override external returns (uint) {
@@ -520,11 +520,11 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         // Shh - currently unused
         seizeTokens;
 
-        if (!markets[cTokenCollateral].isListed || !markets[cTokenBorrowed].isListed) {
+        if (!markets[bTokenCollateral].isListed || !markets[bTokenBorrowed].isListed) {
             return uint(Error.MARKET_NOT_LISTED);
         }
 
-        if (BToken(cTokenCollateral).comptroller() != BToken(cTokenBorrowed).comptroller()) {
+        if (BToken(bTokenCollateral).comptroller() != BToken(bTokenBorrowed).comptroller()) {
             return uint(Error.COMPTROLLER_MISMATCH);
         }
 
@@ -535,21 +535,21 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Validates seize and reverts on rejection. May emit logs.
-     * @param cTokenCollateral Asset which was used as collateral and will be seized
-     * @param cTokenBorrowed Asset which was borrowed by the borrower
+     * @param bTokenCollateral Asset which was used as collateral and will be seized
+     * @param bTokenBorrowed Asset which was borrowed by the borrower
      * @param liquidator The address repaying the borrow and seizing the collateral
      * @param borrower The address of the borrower
      * @param seizeTokens The number of collateral tokens to seize
      */
     function seizeVerify(
-        address cTokenCollateral,
-        address cTokenBorrowed,
+        address bTokenCollateral,
+        address bTokenBorrowed,
         address liquidator,
         address borrower,
         uint seizeTokens) override external {
         // Shh - currently unused
-        cTokenCollateral;
-        cTokenBorrowed;
+        bTokenCollateral;
+        bTokenBorrowed;
         liquidator;
         borrower;
         seizeTokens;
@@ -562,19 +562,19 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Checks if the account should be allowed to transfer tokens in the given market
-     * @param cToken The market to verify the transfer against
+     * @param bToken The market to verify the transfer against
      * @param src The account which sources the tokens
      * @param dst The account which receives the tokens
-     * @param transferTokens The number of cTokens to transfer
+     * @param transferTokens The number of bTokens to transfer
      * @return 0 if the transfer is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
-    function transferAllowed(address cToken, address src, address dst, uint transferTokens) override external returns (uint) {
+    function transferAllowed(address bToken, address src, address dst, uint transferTokens) override external returns (uint) {
         // Pausing is a very serious situation - we revert to sound the alarms
         require(!transferGuardianPaused, "transfer is paused");
 
         // Currently the only consideration is whether or not
         //  the src is allowed to redeem this many tokens
-        uint allowed = redeemAllowedInternal(cToken, src, transferTokens);
+        uint allowed = redeemAllowedInternal(bToken, src, transferTokens);
         if (allowed != uint(Error.NO_ERROR)) {
             return allowed;
         }
@@ -586,14 +586,14 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Validates transfer and reverts on rejection. May emit logs.
-     * @param cToken Asset being transferred
+     * @param bToken Asset being transferred
      * @param src The account which sources the tokens
      * @param dst The account which receives the tokens
-     * @param transferTokens The number of cTokens to transfer
+     * @param transferTokens The number of bTokens to transfer
      */
-    function transferVerify(address cToken, address src, address dst, uint transferTokens) override external {
+    function transferVerify(address bToken, address src, address dst, uint transferTokens) override external {
         // Shh - currently unused
-        cToken;
+        bToken;
         src;
         dst;
         transferTokens;
@@ -608,13 +608,13 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @dev Local vars for avoiding stack-depth limits in calculating account liquidity.
-     *  Note that `cTokenBalance` is the number of cTokens the account owns in the market,
+     *  Note that `bTokenBalance` is the number of bTokens the account owns in the market,
      *  whereas `borrowBalance` is the amount of underlying that the account has borrowed.
      */
     struct AccountLiquidityLocalVars {
         uint sumCollateral;
         uint sumBorrowPlusEffects;
-        uint cTokenBalance;
+        uint bTokenBalance;
         uint borrowBalance;
         uint exchangeRateMantissa;
         uint oraclePriceMantissa;
@@ -648,7 +648,7 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Determine what the account liquidity would be if the given amounts were redeemed/borrowed
-     * @param cTokenModify The market to hypothetically redeem/borrow in
+     * @param bTokenModify The market to hypothetically redeem/borrow in
      * @param account The account to determine liquidity for
      * @param redeemTokens The number of tokens to hypothetically redeem
      * @param borrowAmount The amount of underlying to hypothetically borrow
@@ -658,20 +658,20 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
      */
     function getHypotheticalAccountLiquidity(
         address account,
-        address cTokenModify,
+        address bTokenModify,
         uint redeemTokens,
         uint borrowAmount) public view returns (uint, uint, uint) {
-        (Error err, uint liquidity, uint shortfall) = getHypotheticalAccountLiquidityInternal(account, BToken(cTokenModify), redeemTokens, borrowAmount);
+        (Error err, uint liquidity, uint shortfall) = getHypotheticalAccountLiquidityInternal(account, BToken(bTokenModify), redeemTokens, borrowAmount);
         return (uint(err), liquidity, shortfall);
     }
 
     /**
      * @notice Determine what the account liquidity would be if the given amounts were redeemed/borrowed
-     * @param cTokenModify The market to hypothetically redeem/borrow in
+     * @param bTokenModify The market to hypothetically redeem/borrow in
      * @param account The account to determine liquidity for
      * @param redeemTokens The number of tokens to hypothetically redeem
      * @param borrowAmount The amount of underlying to hypothetically borrow
-     * @dev Note that we calculate the exchangeRateStored for each collateral cToken using stored data,
+     * @dev Note that we calculate the exchangeRateStored for each collateral bToken using stored data,
      *  without calculating accumulated interest.
      * @return (possible error code,
                 hypothetical account liquidity in excess of collateral requirements,
@@ -679,7 +679,7 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
      */
     function getHypotheticalAccountLiquidityInternal(
         address account,
-        BToken cTokenModify,
+        BToken bTokenModify,
         uint redeemTokens,
         uint borrowAmount) internal view returns (Error, uint, uint) {
 
@@ -691,8 +691,8 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         for (uint i = 0; i < assets.length; i++) {
             BToken asset = assets[i];
 
-            // Read the balances and exchange rate from the cToken
-            (oErr, vars.cTokenBalance, vars.borrowBalance, vars.exchangeRateMantissa) = asset.getAccountSnapshot(account);
+            // Read the balances and exchange rate from the bToken
+            (oErr, vars.bTokenBalance, vars.borrowBalance, vars.exchangeRateMantissa) = asset.getAccountSnapshot(account);
             if (oErr != 0) { // semi-opaque error code, we assume NO_ERROR == 0 is invariant between upgrades
                 return (Error.SNAPSHOT_ERROR, 0, 0);
             }
@@ -709,14 +709,14 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
             // Pre-compute a conversion factor from tokens -> ether (normalized price value)
             vars.tokensToDenom = mul_(mul_(vars.collateralFactor, vars.exchangeRate), vars.oraclePrice);
 
-            // sumCollateral += tokensToDenom * cTokenBalance
-            vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.cTokenBalance, vars.sumCollateral);
+            // sumCollateral += tokensToDenom * bTokenBalance
+            vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.bTokenBalance, vars.sumCollateral);
 
             // sumBorrowPlusEffects += oraclePrice * borrowBalance
             vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, vars.borrowBalance, vars.sumBorrowPlusEffects);
 
-            // Calculate effects of interacting with cTokenModify
-            if (asset == cTokenModify) {
+            // Calculate effects of interacting with bTokenModify
+            if (asset == bTokenModify) {
                 // redeem effect
                 // sumBorrowPlusEffects += tokensToDenom * redeemTokens
                 vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.tokensToDenom, redeemTokens, vars.sumBorrowPlusEffects);
@@ -737,16 +737,16 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
 
     /**
      * @notice Calculate number of tokens of collateral asset to seize given an underlying amount
-     * @dev Used in liquidation (called in cToken.liquidateBorrowFresh)
-     * @param cTokenBorrowed The address of the borrowed cToken
-     * @param cTokenCollateral The address of the collateral cToken
-     * @param actualRepayAmount The amount of cTokenBorrowed underlying to convert into cTokenCollateral tokens
-     * @return (errorCode, number of cTokenCollateral tokens to be seized in a liquidation)
+     * @dev Used in liquidation (called in bToken.liquidateBorrowFresh)
+     * @param bTokenBorrowed The address of the borrowed bToken
+     * @param bTokenCollateral The address of the collateral bToken
+     * @param actualRepayAmount The amount of bTokenBorrowed underlying to convert into bTokenCollateral tokens
+     * @return (errorCode, number of bTokenCollateral tokens to be seized in a liquidation)
      */
-    function liquidateCalculateSeizeTokens(address cTokenBorrowed, address cTokenCollateral, uint actualRepayAmount) override external view returns (uint, uint) {
+    function liquidateCalculateSeizeTokens(address bTokenBorrowed, address bTokenCollateral, uint actualRepayAmount) override external view returns (uint, uint) {
         /* Read oracle prices for borrowed and collateral markets */
-        uint priceBorrowedMantissa = oracle.getUnderlyingPrice(BToken(cTokenBorrowed));
-        uint priceCollateralMantissa = oracle.getUnderlyingPrice(BToken(cTokenCollateral));
+        uint priceBorrowedMantissa = oracle.getUnderlyingPrice(BToken(bTokenBorrowed));
+        uint priceCollateralMantissa = oracle.getUnderlyingPrice(BToken(bTokenCollateral));
         if (priceBorrowedMantissa == 0 || priceCollateralMantissa == 0) {
             return (uint(Error.PRICE_ERROR), 0);
         }
@@ -757,7 +757,7 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
          *  seizeTokens = seizeAmount / exchangeRate
          *   = actualRepayAmount * (liquidationIncentive * priceBorrowed) / (priceCollateral * exchangeRate)
          */
-        uint exchangeRateMantissa = BToken(cTokenCollateral).exchangeRateStored(); // Note: reverts on error
+        uint exchangeRateMantissa = BToken(bTokenCollateral).exchangeRateStored(); // Note: reverts on error
         uint seizeTokens;
         Exp memory numerator;
         Exp memory denominator;
@@ -817,18 +817,18 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
     /**
       * @notice Sets the collateralFactor for a market
       * @dev Admin function to set per-market collateralFactor
-      * @param cToken The market to set the factor on
+      * @param bToken The market to set the factor on
       * @param newCollateralFactorMantissa The new collateral factor, scaled by 1e18
       * @return uint 0=success, otherwise a failure. (See ErrorReporter for details)
       */
-    function _setCollateralFactor(BToken cToken, uint newCollateralFactorMantissa) external returns (uint) {
+    function _setCollateralFactor(BToken bToken, uint newCollateralFactorMantissa) external returns (uint) {
         // Check caller is admin
         if (msg.sender != admin) {
             return fail(Error.UNAUTHORIZED, FailureInfo.SET_COLLATERAL_FACTOR_OWNER_CHECK);
         }
 
         // Verify market is listed
-        Market storage market = markets[address(cToken)];
+        Market storage market = markets[address(bToken)];
         if (!market.isListed) {
             return fail(Error.MARKET_NOT_LISTED, FailureInfo.SET_COLLATERAL_FACTOR_NO_EXISTS);
         }
@@ -842,7 +842,7 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         }
 
         // If collateral factor != 0, fail if price == 0
-        if (newCollateralFactorMantissa != 0 && oracle.getUnderlyingPrice(cToken) == 0) {
+        if (newCollateralFactorMantissa != 0 && oracle.getUnderlyingPrice(bToken) == 0) {
             return fail(Error.PRICE_ERROR, FailureInfo.SET_COLLATERAL_FACTOR_WITHOUT_PRICE);
         }
 
@@ -851,7 +851,7 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         market.collateralFactorMantissa = newCollateralFactorMantissa;
 
         // Emit event with asset, old collateral factor, and new collateral factor
-        emit NewCollateralFactor(cToken, oldCollateralFactorMantissa, newCollateralFactorMantissa);
+        emit NewCollateralFactor(bToken, oldCollateralFactorMantissa, newCollateralFactorMantissa);
 
         return uint(Error.NO_ERROR);
     }
@@ -883,57 +883,57 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
     /**
       * @notice Add the market to the markets mapping and set it as listed
       * @dev Admin function to set isListed and add support for the market
-      * @param cToken The address of the market (token) to list
+      * @param bToken The address of the market (token) to list
       * @return uint 0=success, otherwise a failure. (See enum Error for details)
       */
-    function _supportMarket(BToken cToken) external returns (uint) {
+    function _supportMarket(BToken bToken) external returns (uint) {
         if (msg.sender != admin) {
             return fail(Error.UNAUTHORIZED, FailureInfo.SUPPORT_MARKET_OWNER_CHECK);
         }
 
-        if (markets[address(cToken)].isListed) {
+        if (markets[address(bToken)].isListed) {
             return fail(Error.MARKET_ALREADY_LISTED, FailureInfo.SUPPORT_MARKET_EXISTS);
         }
 
-        cToken.isBToken(); // Sanity check to make sure its really a BToken
+        bToken.isBToken(); // Sanity check to make sure its really a BToken
 
-        Market storage newMarket = markets[address(cToken)];
+        Market storage newMarket = markets[address(bToken)];
         newMarket.isListed = true;
         newMarket.collateralFactorMantissa = 0;
 
-        _addMarketInternal(address(cToken));
+        _addMarketInternal(address(bToken));
 
-        emit MarketListed(cToken);
+        emit MarketListed(bToken);
 
         return uint(Error.NO_ERROR);
     }
 
-    function _addMarketInternal(address cToken) internal {
+    function _addMarketInternal(address bToken) internal {
         for (uint i = 0; i < allMarkets.length; i ++) {
-            require(allMarkets[i] != BToken(cToken), "market already added");
+            require(allMarkets[i] != BToken(bToken), "market already added");
         }
-        allMarkets.push(BToken(cToken));
+        allMarkets.push(BToken(bToken));
     }
 
 
 
     /**
-      * @notice Set the given borrow caps for the given cToken markets. Borrowing that brings total borrows to or above borrow cap will revert.
+      * @notice Set the given borrow caps for the given bToken markets. Borrowing that brings total borrows to or above borrow cap will revert.
       * @dev Admin or borrowCapGuardian function to set the borrow caps. A borrow cap of 0 corresponds to unlimited borrowing.
-      * @param cTokens The addresses of the markets (tokens) to change the borrow caps for
+      * @param bTokens The addresses of the markets (tokens) to change the borrow caps for
       * @param newBorrowCaps The new borrow cap values in underlying to be set. A value of 0 corresponds to unlimited borrowing.
       */
-    function _setMarketBorrowCaps(BToken[] calldata cTokens, uint[] calldata newBorrowCaps) external {
+    function _setMarketBorrowCaps(BToken[] calldata bTokens, uint[] calldata newBorrowCaps) external {
     	require(msg.sender == admin || msg.sender == borrowCapGuardian, "only admin or borrow cap guardian can set borrow caps");
 
-        uint numMarkets = cTokens.length;
+        uint numMarkets = bTokens.length;
         uint numBorrowCaps = newBorrowCaps.length;
 
         require(numMarkets != 0 && numMarkets == numBorrowCaps, "invalid input");
 
         for(uint i = 0; i < numMarkets; i++) {
-            borrowCaps[address(cTokens[i])] = newBorrowCaps[i];
-            emit NewBorrowCap(cTokens[i], newBorrowCaps[i]);
+            borrowCaps[address(bTokens[i])] = newBorrowCaps[i];
+            emit NewBorrowCap(bTokens[i], newBorrowCaps[i]);
         }
     }
 
@@ -976,23 +976,23 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
         return uint(Error.NO_ERROR);
     }
 
-    function _setMintPaused(BToken cToken, bool state) public returns (bool) {
-        require(markets[address(cToken)].isListed, "cannot pause a market that is not listed");
+    function _setMintPaused(BToken bToken, bool state) public returns (bool) {
+        require(markets[address(bToken)].isListed, "cannot pause a market that is not listed");
         require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can pause");
         require(msg.sender == admin || state == true, "only admin can unpause");
 
-        mintGuardianPaused[address(cToken)] = state;
-        emit ActionPaused(cToken, "Mint", state);
+        mintGuardianPaused[address(bToken)] = state;
+        emit ActionPaused(bToken, "Mint", state);
         return state;
     }
 
-    function _setBorrowPaused(BToken cToken, bool state) public returns (bool) {
-        require(markets[address(cToken)].isListed, "cannot pause a market that is not listed");
+    function _setBorrowPaused(BToken bToken, bool state) public returns (bool) {
+        require(markets[address(bToken)].isListed, "cannot pause a market that is not listed");
         require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can pause");
         require(msg.sender == admin || state == true, "only admin can unpause");
 
-        borrowGuardianPaused[address(cToken)] = state;
-        emit ActionPaused(cToken, "Borrow", state);
+        borrowGuardianPaused[address(bToken)] = state;
+        emit ActionPaused(bToken, "Borrow", state);
         return state;
     }
 
@@ -1038,15 +1038,15 @@ contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerError
     }
 
     /**
-     * @notice Returns true if the given cToken market has been deprecated
-     * @dev All borrows in a deprecated cToken market can be immediately liquidated
-     * @param cToken The market to check if deprecated
+     * @notice Returns true if the given bToken market has been deprecated
+     * @dev All borrows in a deprecated bToken market can be immediately liquidated
+     * @param bToken The market to check if deprecated
      */
-    function isDeprecated(BToken cToken) public view returns (bool) {
+    function isDeprecated(BToken bToken) public view returns (bool) {
         return
-            markets[address(cToken)].collateralFactorMantissa == 0 &&
-            borrowGuardianPaused[address(cToken)] == true &&
-            cToken.reserveFactorMantissa() == 1e18
+            markets[address(bToken)].collateralFactorMantissa == 0 &&
+            borrowGuardianPaused[address(bToken)] == true &&
+            bToken.reserveFactorMantissa() == 1e18
         ;
     }
 

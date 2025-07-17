@@ -3,7 +3,7 @@ pragma solidity ^0.8.10;
 
 import "./BToken.sol";
 
-interface CompLike {
+interface BloLike {
     function delegate(address delegatee) external;
 }
 
@@ -217,12 +217,12 @@ contract BErc20 is BToken, BErc20Interface {
     }
 
     /**
-    * @notice Admin call to delegate the votes of the COMP-like underlying
-    * @param compLikeDelegatee The address to delegate votes to
-    * @dev BTokens whose underlying are not CompLike should revert here
+    * @notice Admin call to delegate the votes of the BLO-like underlying
+    * @param bloLikeDelegatee The address to delegate votes to
+    * @dev BTokens whose underlying are not BloLike should revert here
     */
-    function _delegateCompLikeTo(address compLikeDelegatee) external {
-        require(msg.sender == admin, "only the admin may set the comp-like delegate");
-        CompLike(underlying).delegate(compLikeDelegatee);
+    function _delegateBloLikeTo(address bloLikeDelegatee) external {
+        require(msg.sender == admin, "only the admin may set the blo-like delegate");
+        BloLike(underlying).delegate(bloLikeDelegatee);
     }
 }

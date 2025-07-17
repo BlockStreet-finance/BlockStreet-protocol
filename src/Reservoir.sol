@@ -5,7 +5,7 @@ pragma solidity ^0.8.10;
  * @title Reservoir Contract
  * @notice Distributes a token to a different contract at a fixed rate.
  * @dev This contract must be poked via the `drip()` function every so often.
- * @author Compound
+ * @author BlockStreet
  */
 contract Reservoir {
 

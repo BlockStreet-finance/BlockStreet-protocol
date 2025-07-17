@@ -4,8 +4,8 @@ pragma solidity ^0.8.10;
 import "./InterestRateModel.sol";
 
 /**
-  * @title Compound's JumpRateModel Contract
-  * @author Compound
+  * @title BlockStreet's JumpRateModel Contract
+  * @author BlockStreet
   */
 contract JumpRateModel is InterestRateModel {
     event NewInterestParams(uint baseRatePerBlock, uint multiplierPerBlock, uint jumpMultiplierPerBlock, uint kink);

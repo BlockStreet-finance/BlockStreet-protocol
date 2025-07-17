@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.10;
 
-import "./ComptrollerInterface.sol";
+import "./BlotrollerInterface.sol";
 import "./InterestRateModel.sol";
 import "./EIP20NonStandardInterface.sol";
 import "./ErrorReporter.sol";
 
-contract CTokenStorage {
+contract BTokenStorage {
     /**
      * @dev Guard variable for re-entrancy checks
      */
@@ -44,16 +44,16 @@ contract CTokenStorage {
     address payable public pendingAdmin;
 
     /**
-     * @notice Contract which oversees inter-cToken operations
+     * @notice Contract which oversees inter-bToken operations
      */
-    ComptrollerInterface public comptroller;
+    BlotrollerInterface public comptroller;
 
     /**
      * @notice Model which tells what the current interest rate should be
      */
     InterestRateModel public interestRateModel;
 
-    // Initial exchange rate used when minting the first CTokens (used when totalSupply = 0)
+    // Initial exchange rate used when minting the first BTokens (used when totalSupply = 0)
     uint internal initialExchangeRateMantissa;
 
     /**
@@ -111,11 +111,11 @@ contract CTokenStorage {
     uint public constant protocolSeizeShareMantissa = 2.8e16; //2.8%
 }
 
-abstract contract CTokenInterface is CTokenStorage {
+abstract contract BTokenInterface is BTokenStorage {
     /**
-     * @notice Indicator that this is a CToken contract (for inspection)
+     * @notice Indicator that this is a BToken contract (for inspection)
      */
-    bool public constant isCToken = true;
+    bool public constant isBToken = true;
 
 
     /*** Market Events ***/
@@ -148,7 +148,7 @@ abstract contract CTokenInterface is CTokenStorage {
     /**
      * @notice Event emitted when a borrow is liquidated
      */
-    event LiquidateBorrow(address liquidator, address borrower, uint repayAmount, address cTokenCollateral, uint seizeTokens);
+    event LiquidateBorrow(address liquidator, address borrower, uint repayAmount, address bTokenCollateral, uint seizeTokens);
 
 
     /*** Admin Events ***/
@@ -166,7 +166,7 @@ abstract contract CTokenInterface is CTokenStorage {
     /**
      * @notice Event emitted when comptroller is changed
      */
-    event NewComptroller(ComptrollerInterface oldComptroller, ComptrollerInterface newComptroller);
+    event NewComptroller(BlotrollerInterface oldComptroller, BlotrollerInterface newComptroller);
 
     /**
      * @notice Event emitted when interestRateModel is changed
@@ -224,20 +224,20 @@ abstract contract CTokenInterface is CTokenStorage {
 
     function _setPendingAdmin(address payable newPendingAdmin) virtual external returns (uint);
     function _acceptAdmin() virtual external returns (uint);
-    function _setComptroller(ComptrollerInterface newComptroller) virtual external returns (uint);
+    function _setComptroller(BlotrollerInterface newComptroller) virtual external returns (uint);
     function _setReserveFactor(uint newReserveFactorMantissa) virtual external returns (uint);
     function _reduceReserves(uint reduceAmount) virtual external returns (uint);
     function _setInterestRateModel(InterestRateModel newInterestRateModel) virtual external returns (uint);
 }
 
-contract CErc20Storage {
+contract BErc20Storage {
     /**
-     * @notice Underlying asset for this CToken
+     * @notice Underlying asset for this BToken
      */
     address public underlying;
 }
 
-abstract contract CErc20Interface is CErc20Storage {
+abstract contract BErc20Interface is BErc20Storage {
 
     /*** User Interface ***/
 
@@ -247,7 +247,7 @@ abstract contract CErc20Interface is CErc20Storage {
     function borrow(uint borrowAmount) virtual external returns (uint);
     function repayBorrow(uint repayAmount) virtual external returns (uint);
     function repayBorrowBehalf(address borrower, uint repayAmount) virtual external returns (uint);
-    function liquidateBorrow(address borrower, uint repayAmount, CTokenInterface cTokenCollateral) virtual external returns (uint);
+    function liquidateBorrow(address borrower, uint repayAmount, BTokenInterface bTokenCollateral) virtual external returns (uint);
     function sweepToken(EIP20NonStandardInterface token) virtual external;
 
 
@@ -256,14 +256,14 @@ abstract contract CErc20Interface is CErc20Storage {
     function _addReserves(uint addAmount) virtual external returns (uint);
 }
 
-contract CDelegationStorage {
+contract BDelegationStorage {
     /**
      * @notice Implementation address for this contract
      */
     address public implementation;
 }
 
-abstract contract CDelegatorInterface is CDelegationStorage {
+abstract contract BDelegatorInterface is BDelegationStorage {
     /**
      * @notice Emitted when implementation is changed
      */
@@ -278,7 +278,7 @@ abstract contract CDelegatorInterface is CDelegationStorage {
     function _setImplementation(address implementation_, bool allowResign, bytes memory becomeImplementationData) virtual external;
 }
 
-abstract contract CDelegateInterface is CDelegationStorage {
+abstract contract BDelegateInterface is BDelegationStorage {
     /**
      * @notice Called by the delegator on a delegate to initialize it for duty
      * @dev Should revert if any issues arise which make it unfit for delegation
