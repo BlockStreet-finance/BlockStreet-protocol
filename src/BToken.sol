@@ -906,7 +906,7 @@ abstract contract BToken is BTokenInterface, ExponentialNoError, TokenErrorRepor
 
         BlotrollerInterface oldComptroller = comptroller;
         // Ensure invoke comptroller.isComptroller() returns true
-        require(newComptroller.isComptroller(), "marker method returned false");
+        require(newComptroller.isBlotroller(), "marker method returned false");
 
         // Set market's comptroller to newComptroller
         comptroller = newComptroller;
