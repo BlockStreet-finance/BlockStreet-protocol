@@ -42,11 +42,11 @@ contract Unitroller is UnitrollerAdminStorage, BlotrollerErrorReporter {
             return fail(Error.UNAUTHORIZED, FailureInfo.SET_PENDING_IMPLEMENTATION_OWNER_CHECK);
         }
 
-        address oldPendingImplementation = pendingComptrollerImplementation;
+        address oldPendingImplementation = pendingBlotrollerImplementation;
 
-        pendingComptrollerImplementation = newPendingImplementation;
+        pendingBlotrollerImplementation = newPendingImplementation;
 
-        emit NewPendingImplementation(oldPendingImplementation, pendingComptrollerImplementation);
+        emit NewPendingImplementation(oldPendingImplementation, pendingBlotrollerImplementation);
 
         return uint(Error.NO_ERROR);
     }
@@ -58,20 +58,20 @@ contract Unitroller is UnitrollerAdminStorage, BlotrollerErrorReporter {
     */
     function _acceptImplementation() public returns (uint) {
         // Check caller is pendingImplementation and pendingImplementation ≠ address(0)
-        if (msg.sender != pendingComptrollerImplementation || pendingComptrollerImplementation == address(0)) {
+        if (msg.sender != pendingBlotrollerImplementation || pendingBlotrollerImplementation == address(0)) {
             return fail(Error.UNAUTHORIZED, FailureInfo.ACCEPT_PENDING_IMPLEMENTATION_ADDRESS_CHECK);
         }
 
         // Save current values for inclusion in log
         address oldImplementation = comptrollerImplementation;
-        address oldPendingImplementation = pendingComptrollerImplementation;
+        address oldPendingImplementation = pendingBlotrollerImplementation;
 
-        comptrollerImplementation = pendingComptrollerImplementation;
+        comptrollerImplementation = pendingBlotrollerImplementation;
 
-        pendingComptrollerImplementation = address(0);
+        pendingBlotrollerImplementation = address(0);
 
         emit NewImplementation(oldImplementation, comptrollerImplementation);
-        emit NewPendingImplementation(oldPendingImplementation, pendingComptrollerImplementation);
+        emit NewPendingImplementation(oldPendingImplementation, pendingBlotrollerImplementation);
 
         return uint(Error.NO_ERROR);
     }
