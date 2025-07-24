@@ -53,9 +53,6 @@ contract BlotrollerV1Storage is UnitrollerAdminStorage {
      */
     mapping(address => BToken[]) public accountAssets;
 
-}
-
-contract BlotrollerV2Storage is BlotrollerV1Storage {
     struct Market {
         // Whether or not this market is listed
         bool isListed;
@@ -76,7 +73,6 @@ contract BlotrollerV2Storage is BlotrollerV1Storage {
      */
     mapping(address => Market) public markets;
 
-
     /**
      * @notice The Pause Guardian can pause certain actions as a safety mechanism.
      *  Actions which allow users to remove their own assets cannot be paused.
@@ -89,26 +85,13 @@ contract BlotrollerV2Storage is BlotrollerV1Storage {
     bool public seizeGuardianPaused;
     mapping(address => bool) public mintGuardianPaused;
     mapping(address => bool) public borrowGuardianPaused;
-}
 
-contract BlotrollerV3Storage is BlotrollerV2Storage {
     /// @notice A list of all markets
     BToken[] public allMarkets;
-}
 
-contract BlotrollerV4Storage is BlotrollerV3Storage {
     // @notice The borrowCapGuardian can set borrowCaps to any number for any market. Lowering the borrow cap could disable borrowing on the given market.
     address public borrowCapGuardian;
 
     // @notice Borrow caps enforced by borrowAllowed for each bToken address. Defaults to zero which corresponds to unlimited borrowing.
     mapping(address => uint) public borrowCaps;
-}
-
-contract BlotrollerV5Storage is BlotrollerV4Storage {
-}
-
-contract BlotrollerV6Storage is BlotrollerV5Storage {
-}
-
-contract BlotrollerV7Storage is BlotrollerV6Storage {
 }

@@ -5,6 +5,11 @@ abstract contract BlotrollerInterface {
     /// @notice Indicator that this is a Blotroller contract (for inspection)
     bool public constant isBlotroller = true;
 
+    /// @notice Indicator that this is a Comptroller contract (for inspection)
+    function isComptroller() external pure returns (bool) {
+        return true;
+    }
+
     /*** Assets You Are In ***/
 
     function enterMarkets(address[] calldata bTokens) virtual external returns (uint[] memory);
