@@ -26,7 +26,7 @@ contract UnitrollerAdminStorage {
     address public pendingBlotrollerImplementation;
 }
 
-contract BlotrollerV1Storage is UnitrollerAdminStorage {
+contract BlotrollerStorage is UnitrollerAdminStorage {
 
     /**
      * @notice Oracle which gives the price of any given asset
