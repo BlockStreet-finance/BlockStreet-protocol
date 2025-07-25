@@ -87,7 +87,7 @@ contract BloPriceOracle is PriceOracle, Ownable {
         // The Blotroller expects prices scaled by 1e(36 - underlying_decimals).
         // Our internal price has 6 decimals, so we scale it to 36 total decimals
         // before dividing by the underlying token's base unit.
-        //return (priceInternal * 1e30) / config.baseUnit;
+        //return (priceInternal * 1e30) / config.baseUnit; 
         return OZMath.mulDiv(priceInternal, 1e30, config.baseUnit);
     }
 
@@ -104,7 +104,11 @@ contract BloPriceOracle is PriceOracle, Ownable {
                 return (0, 0);
             }
             // Normalize price to our internal 6-decimal format.
-            price = (uint256(answer) * INTERNAL_PRICE_UNIT) / (10 ** config.chainlinkFeed.decimals());
+            uint8 chainlinkDecimals = config.chainlinkFeed.decimals();
+            price = (uint256(answer) * INTERNAL_PRICE_UNIT) / (10 ** chainlinkDecimals);
+            /*if (price == 0) {
+                return (0, 0);
+            }*/
             timestamp = ts;
         } catch {
             return (0, 0);
@@ -127,6 +131,9 @@ contract BloPriceOracle is PriceOracle, Ownable {
             }
             // Normalize price to our internal 6-decimal format.
             price = PythUtils.convertToUint(pythPrice.price, pythPrice.expo, uint8(INTERNAL_PRICE_DECIMALS));
+            /*if (price == 0) {
+                return (0, 0);
+            }*/
             timestamp = pythPrice.publishTime;
         } catch {
             return (0, 0);
