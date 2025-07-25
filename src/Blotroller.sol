@@ -12,7 +12,7 @@ import "./Unitroller.sol";
  * @title BlockStreet's Blotroller Contract
  * @author BlockStreet
  */
-contract Blotroller is BlotrollerV7Storage, BlotrollerInterface, BlotrollerErrorReporter, ExponentialNoError {
+contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorReporter, ExponentialNoError {
     /// @notice Emitted when an admin supports a market
     event MarketListed(BToken bToken);
 
