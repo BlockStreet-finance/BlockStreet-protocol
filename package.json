@@ -1,0 +1,11 @@
+{
+  "name": "BlockStreet-protocol",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:BlockStreet-finance/BlockStreet-protocol.git",
+  "author": "BlockStreet",
+  "license": "MIT",
+  "dependencies": {
+    "@pythnetwork/pyth-sdk-solidity": "^4.2.0"
+  }
+}
