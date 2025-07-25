@@ -104,8 +104,7 @@ contract BloPriceOracle is PriceOracle, Ownable {
                 return (0, 0);
             }
             // Normalize price to our internal 6-decimal format.
-            uint8 chainlinkDecimals = config.chainlinkFeed.decimals();
-            price = (uint256(answer) * INTERNAL_PRICE_UNIT) / (10 ** chainlinkDecimals);
+            price = (uint256(answer) * INTERNAL_PRICE_UNIT) / (10 ** config.chainlinkFeed.decimals());
             /*if (price == 0) {
                 return (0, 0);
             }*/
