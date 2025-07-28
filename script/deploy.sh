@@ -84,12 +84,6 @@ eval $DEPLOY_CMD
 if [ $? -eq 0 ]; then
     echo "✅ Deployment completed successfully!"
     echo ""
-    echo "📋 Next steps:"
-    echo "1. Save the deployment addresses"
-    echo "2. Accept admin role from your Safe multisig"
-    echo "3. Update price oracle with real market prices"
-    echo "4. Test protocol functionality"
-    echo ""
     echo "📁 Deployment artifacts saved in broadcast/ directory"
 else
     echo "❌ Deployment failed!"

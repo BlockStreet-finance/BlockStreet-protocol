@@ -38,7 +38,7 @@
       "symbol": "USDC",
       "decimals": 18,
       "underlying": {
-        "testnet": "0x7A9d8bd76e6239482548d591A47b7a9D8151A514",
+        "testnet": "0xD3a3d280395f3ce266a23B7656f18394B39A7469",
         "mainnet": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
       },
       "collateralFactor": "800000000000000000",
@@ -53,7 +53,7 @@
       "symbol": "TSLA",
       "decimals": 18,
       "underlying": {
-        "testnet": "0xf54d270669d1127a36b276c3d25295d8ea52a52d",
+        "testnet": "0x387f53e22af69ff1ee22d678660c00e3e7c57e58",
         "mainnet": "0x0000000000000000000000000000000000000000"
       },
       "collateralFactor": "700000000000000000",
