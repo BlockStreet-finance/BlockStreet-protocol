@@ -31,11 +31,11 @@ done
 
 # Set network-specific variables
 if [ "$ENVIRONMENT" = "testnet" ]; then
-    NETWORK_FLAG="--rpc-url ${BSC_TESTNET_RPC:-https://data-seed-prebsc-1-s1.binance.org:8545/}"
+    NETWORK_FLAG="--rpc-url ${BSC_TESTNET_RPC:-https://data-seed-prebsc-1-s1.binance.org:8545/} --with-gas-price 100000000"
     ETHERSCAN_API_KEY="$BSCSCAN_TESTNET_API_KEY"
     echo "🚀 Deploying to BSC Testnet..."
 elif [ "$ENVIRONMENT" = "mainnet" ]; then
-    NETWORK_FLAG="--rpc-url ${BSC_MAINNET_RPC:-https://bsc-dataseed.binance.org/}"
+    NETWORK_FLAG="--rpc-url ${BSC_MAINNET_RPC:-https://bsc-dataseed.binance.org/} --with-gas-price 100000000"
     ETHERSCAN_API_KEY="$BSCSCAN_API_KEY"
     echo "🚀 Deploying to BSC Mainnet..."
     echo "⚠️  WARNING: This is MAINNET deployment!"

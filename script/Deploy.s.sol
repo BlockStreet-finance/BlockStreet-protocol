@@ -119,7 +119,7 @@ contract DeployScript is Script {
         // Parse protocol config
         config.closeFactor = configFile.readUint(".protocol.closeFactor");
         config.liquidationIncentive = configFile.readUint(".protocol.liquidationIncentive");
-        config.maxAssets = configFile.readUint(".protocol.maxAssets");
+        config.maxAssets = configFile.readUint(".protocol.maxAssets");  // 暂时没用
         
         // Parse governance config - prioritize env vars, fallback to JSON config
         address jsonAdmin = configFile.readAddress(".governance.admin");
