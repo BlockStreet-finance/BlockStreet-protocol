@@ -65,6 +65,9 @@ fi
 
 echo "✅ Environment validated"
 
+# Create deployments directory if it doesn't exist
+mkdir -p deployments
+
 # Deploy contracts
 echo "📦 Deploying contracts..."
 
