@@ -81,20 +81,20 @@ Edit `config/deploy.json` to customize deployment parameters:
 ```json
 {
   "protocol": {
-    "closeFactor": "500000000000000000",            // 50%
-    "liquidationIncentive": "1080000000000000000",  // 108%
+    "closeFactor": "500000000000000000",
+    "liquidationIncentive": "1080000000000000000",
     "maxAssets": 10
   },
   "governance": {
-    "admin": "0x...",                               // Admin address
-    "pauseGuardian": "0x...",                       // Pause guardian
-    "borrowCapGuardian": "0x..."                    // Borrow cap guardian
+    "admin": "0x...",
+    "pauseGuardian": "0x...",
+    "borrowCapGuardian": "0x..."
   },
   "markets": {
     "USDC": {
-      "collateralFactor": "800000000000000000",     // 80%
-      "reserveFactor": "100000000000000000",        // 10%
-      "borrowCap": "10000000000000000000000000"     // 10M USDC
+      "collateralFactor": "800000000000000000",
+      "reserveFactor": "100000000000000000",
+      "borrowCap": "10000000000000000000000000"
     }
   }
 }
