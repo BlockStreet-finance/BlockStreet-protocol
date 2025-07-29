@@ -3,7 +3,7 @@
     "bsc_testnet": {
       "name": "BSC Testnet",
       "chainId": 97,
-      "rpcUrl": "https://data-seed-prebsc-1-s3.bnbchain.org:8545/",
+      "rpcUrl": "https://data-seed-prebsc-1-s1.binance.org:8545/",
       "blockExplorer": "https://testnet.bscscan.com"
     },
     "bsc_mainnet": {
@@ -11,6 +11,28 @@
       "chainId": 56,
       "rpcUrl": "https://bsc-dataseed.binance.org/",
       "blockExplorer": "https://bscscan.com"
+    }
+  },
+  "deployedContracts": {
+    "testnet": {
+      "unitroller": "0x0000000000000000000000000000000000000000",
+      "blotroller": "0x0000000000000000000000000000000000000000",
+      "priceOracle": "0x0000000000000000000000000000000000000000",
+      "interestRateModel": "0x0000000000000000000000000000000000000000",
+      "bErc20Delegate": "0x0000000000000000000000000000000000000000",
+      "bUSDC": "0x0000000000000000000000000000000000000000",
+      "bTSLA": "0x0000000000000000000000000000000000000000",
+      "mockUSDC": "0x0000000000000000000000000000000000000000",
+      "mockTSLA": "0x0000000000000000000000000000000000000000"
+    },
+    "mainnet": {
+      "unitroller": "0x0000000000000000000000000000000000000000",
+      "blotroller": "0x0000000000000000000000000000000000000000",
+      "priceOracle": "0x0000000000000000000000000000000000000000",
+      "interestRateModel": "0x0000000000000000000000000000000000000000",
+      "bErc20Delegate": "0x0000000000000000000000000000000000000000",
+      "bUSDC": "0x0000000000000000000000000000000000000000",
+      "bTSLA": "0x0000000000000000000000000000000000000000"
     }
   },
   "protocol": {
@@ -34,11 +56,11 @@
   },
   "markets": {
     "USDC": {
-      "name": "USDC Token",
-      "symbol": "USDC",
-      "decimals": 18,
+      "name": "BlockStreet USDC",
+      "symbol": "bUSDC",
+      "decimals": 8,
       "underlying": {
-        "testnet": "0xD3a3d280395f3ce266a23B7656f18394B39A7469",
+        "testnet": "0x64544969ed7EBf5f083679233325356EbE738930",
         "mainnet": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
       },
       "collateralFactor": "800000000000000000",
@@ -49,11 +71,11 @@
       "comment": "Collateral: 80%, Reserve: 10%, BorrowCap: 10M USDC, Price: $1"
     },
     "TSLA": {
-      "name": "TSLA Stock",
-      "symbol": "TSLA",
-      "decimals": 18,
+      "name": "BlockStreet Tesla Stock Token",
+      "symbol": "bTSLA",
+      "decimals": 8,
       "underlying": {
-        "testnet": "0x387f53e22af69ff1ee22d678660c00e3e7c57e58",
+        "testnet": "0x0000000000000000000000000000000000000000",
         "mainnet": "0x0000000000000000000000000000000000000000"
       },
       "collateralFactor": "700000000000000000",
