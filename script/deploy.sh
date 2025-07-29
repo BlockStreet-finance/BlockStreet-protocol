@@ -77,8 +77,10 @@ DEPLOY_CMD="forge script script/Deploy.s.sol:DeployScript \
     --broadcast \
     -vvvv"
 
-if [ "$VERIFY_FLAG" = "--verify" ]; then
-    DEPLOY_CMD="$DEPLOY_CMD --verify --etherscan-api-key $ETHERSCAN_API_KEY"
+if [ "$VERIFY_FLAG" = "--verify" ] && [ "$ENVIRONMENT" = "testnet" ]; then
+    DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url https://api.etherscan.io/v2/api?chainid=97 --etherscan-api-key $ETHERSCAN_API_KEY"
+else
+    DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url https://api.etherscan.io/v2/api?chainid=56 --etherscan-api-key $ETHERSCAN_API_KEY"
 fi
 
 echo "Executing: $DEPLOY_CMD"
