@@ -9,6 +9,7 @@ import "../src/BErc20Delegator.sol";
 import "../src/BErc20Delegate.sol";
 import "../src/SimplePriceOracle.sol";
 import "../src/JumpRateModel.sol";
+import "../src/MockERC20.sol";
 
 contract DeployScript is Script {
     using stdJson for string;
@@ -54,6 +55,10 @@ contract DeployScript is Script {
     BErc20Delegator public bUSDC;
     BErc20Delegator public bTSLA;
     
+    // Add mock tokens
+    MockERC20 public mockUSDC;
+    MockERC20 public mockTSLA;
+    
     Config public config;
     string public network;
     
@@ -68,6 +73,11 @@ contract DeployScript is Script {
         console.log("Network:", network);
         console.log("Deployer:", msg.sender);
         console.log("Admin:", config.admin);
+        
+        // Deploy test tokens first (testnet only)
+        if (block.chainid == 97) {
+            _deployTestTokens();
+        }
         
         // Deploy core contracts
         _deployCore();
@@ -85,6 +95,9 @@ contract DeployScript is Script {
         _transferOwnership();
         
         vm.stopBroadcast();
+        
+        // Save deployment addresses
+        _saveDeploymentAddresses();
         
         // Log deployment summary
         _logDeployment();
@@ -300,6 +313,67 @@ contract DeployScript is Script {
         }
     }
     
+    function _deployTestTokens() internal {
+        console.log("\n=== Deploying Test Tokens ===");
+        
+        // Deploy mock USDC if underlying is zero address
+        if (config.usdcMarket.underlying == address(0)) {
+            mockUSDC = new MockERC20(
+                "Mock USDC",
+                "USDC",
+                6,
+                1000000 * 10**6  // 1M USDC
+            );
+            config.usdcMarket.underlying = address(mockUSDC);
+            console.log("Mock USDC deployed:", address(mockUSDC));
+        }
+        
+        // Deploy mock TSLA if underlying is zero address
+        if (config.tslaMarket.underlying == address(0)) {
+            mockTSLA = new MockERC20(
+                "Mock Tesla Stock Token",
+                "TSLA",
+                18,
+                100000 * 10**18  // 100K TSLA
+            );
+            config.tslaMarket.underlying = address(mockTSLA);
+            console.log("Mock TSLA deployed:", address(mockTSLA));
+        }
+    }
+    
+    function _saveDeploymentAddresses() internal {
+        console.log("\n=== Saving Deployment Addresses ===");
+        
+        string memory networkKey = network;
+        string memory addressesJson = "{}";
+        
+        // Core contracts
+        vm.serializeAddress(addressesJson, "unitroller", address(unitroller));
+        vm.serializeAddress(addressesJson, "blotroller", address(blotroller));
+        vm.serializeAddress(addressesJson, "priceOracle", address(priceOracle));
+        vm.serializeAddress(addressesJson, "interestRateModel", address(interestRateModel));
+        vm.serializeAddress(addressesJson, "bErc20Delegate", address(bErc20Delegate));
+        
+        // Market contracts
+        vm.serializeAddress(addressesJson, "bUSDC", address(bUSDC));
+        vm.serializeAddress(addressesJson, "bTSLA", address(bTSLA));
+        
+        // Test tokens (testnet only)
+        if (block.chainid == 97) {
+            if (address(mockUSDC) != address(0)) {
+                vm.serializeAddress(addressesJson, "mockUSDC", address(mockUSDC));
+            }
+            if (address(mockTSLA) != address(0)) {
+                addressesJson = vm.serializeAddress(addressesJson, "mockTSLA", address(mockTSLA));
+            }
+        }
+        
+        // Write to file
+        string memory fileName = string.concat("deployments/", networkKey, "-latest.json");
+        vm.writeJson(addressesJson, fileName);
+        console.log("Addresses saved to:", fileName);
+    }
+    
     function _logDeployment() internal view {
         console.log("\n=== Deployment Summary ===");
         console.log("Network:", network);
@@ -310,6 +384,16 @@ contract DeployScript is Script {
         console.log("BErc20Delegate:", address(bErc20Delegate));
         console.log("bUSDC:", address(bUSDC));
         console.log("bTSLA:", address(bTSLA));
+        
+        if (block.chainid == 97) {
+            if (address(mockUSDC) != address(0)) {
+                console.log("Mock USDC:", address(mockUSDC));
+            }
+            if (address(mockTSLA) != address(0)) {
+                console.log("Mock TSLA:", address(mockTSLA));
+            }
+        }
+        
         console.log("Admin:", config.admin);
         console.log("\n=== Next Steps ===");
         console.log("1. Verify contracts on BSCScan");
