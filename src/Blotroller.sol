@@ -526,6 +526,9 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
                     relevantShortfall = shortfallB; // Type A borrows require Type B collateral
                 } else if (borrowedTokenType == TokenType.TYPE_B) {
                     relevantShortfall = shortfallA; // Type B borrows require Type A collateral
+                } else {
+                    // UNCLASSIFIED tokens shouldn't be borrowable in separation mode
+                    return uint(Error.MARKET_NOT_LISTED);
                 }
                 
                 if (relevantShortfall == 0) {

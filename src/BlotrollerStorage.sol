@@ -96,10 +96,10 @@ contract BlotrollerStorage is UnitrollerAdminStorage {
     mapping(address => uint) public borrowCaps;
 
     /// @notice Token classification system for A/B borrowing rules
-    /// @dev 1 = Type A, 2 = Type B. 0 means not classified for A/B separation
+    /// @dev 0 = Type A, 1 = Type B.
     enum TokenType { 
-        TYPE_A,        // 1: When deposited, can only borrow Type B tokens
-        TYPE_B         // 2: When deposited, can only borrow Type A tokens
+        TYPE_A,        // 0: When deposited, can only borrow Type B tokens
+        TYPE_B         // 1: When deposited, can only borrow Type A tokens
     }
 
     /// @notice Mapping of bToken address to its classification type
