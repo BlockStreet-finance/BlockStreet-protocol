@@ -270,12 +270,39 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
         }
 
         /* Otherwise, perform a hypothetical liquidity check to guard against shortfall */
-        (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(redeemer, BToken(bToken), redeemTokens, 0);
-        if (err != Error.NO_ERROR) {
-            return uint(err);
-        }
-        if (shortfall > 0) {
-            return uint(Error.INSUFFICIENT_LIQUIDITY);
+        if (separationModeEnabled) {
+            // Get token type being redeemed
+            TokenType redeemTokenType = tokenTypes[bToken];
+            
+            (Error err, uint liquidityA, uint shortfallA, uint liquidityB, uint shortfallB) = 
+                getHypotheticalAccountLiquidityInternalSeparated(redeemer, BToken(bToken), redeemTokens, 0);
+            
+            if (err != Error.NO_ERROR) {
+                return uint(err);
+            }
+            
+            // Check if redeeming would cause shortfall in the corresponding borrow type
+            // Type A collateral supports Type B borrowing
+            // Type B collateral supports Type A borrowing
+            if (redeemTokenType == TokenType.TYPE_A) {
+                if (shortfallB > 0) {
+                    return uint(Error.INSUFFICIENT_LIQUIDITY);
+                }
+            } else if (redeemTokenType == TokenType.TYPE_B) {
+                if (shortfallA > 0) {
+                    return uint(Error.INSUFFICIENT_LIQUIDITY);
+                }
+            }
+            // Non-classified tokens can be redeemed freely in separation mode
+        } else {
+            // Original logic for non-separation mode
+            (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(redeemer, BToken(bToken), redeemTokens, 0);
+            if (err != Error.NO_ERROR) {
+                return uint(err);
+            }
+            if (shortfall > 0) {
+                return uint(Error.INSUFFICIENT_LIQUIDITY);
+            }
         }
 
         return uint(Error.NO_ERROR);
@@ -341,15 +368,44 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
             require(nextTotalBorrows < borrowCap, "market borrow cap reached");
         }
 
-        (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(borrower, BToken(bToken), 0, borrowAmount);
-        if (err != Error.NO_ERROR) {
-            return uint(err);
+        // Check liquidity based on separation mode
+        if (separationModeEnabled) {
+            // Get token type being borrowed
+            TokenType borrowTokenType = tokenTypes[bToken];
+            
+            // In separation mode, only allow borrowing A/B classified tokens
+            if (borrowTokenType != TokenType.TYPE_A && borrowTokenType != TokenType.TYPE_B) {
+                return uint(Error.MARKET_NOT_LISTED); // Reuse this error for non-classified tokens in separation mode
+            }
+            
+            (Error err, uint liquidityA, uint shortfallA, uint liquidityB, uint shortfallB) = 
+                getHypotheticalAccountLiquidityInternalSeparated(borrower, BToken(bToken), 0, borrowAmount);
+            
+            if (err != Error.NO_ERROR) {
+                return uint(err);
+            }
+            
+            // Type A tokens can only be borrowed with Type B collateral
+            // Type B tokens can only be borrowed with Type A collateral
+            if (borrowTokenType == TokenType.TYPE_A) {
+                if (shortfallB > 0) {
+                    return uint(Error.INSUFFICIENT_LIQUIDITY);
+                }
+            } else if (borrowTokenType == TokenType.TYPE_B) {
+                if (shortfallA > 0) {
+                    return uint(Error.INSUFFICIENT_LIQUIDITY);
+                }
+            }
+        } else {
+            // Original logic for non-separation mode
+            (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(borrower, BToken(bToken), 0, borrowAmount);
+            if (err != Error.NO_ERROR) {
+                return uint(err);
+            }
+            if (shortfall > 0) {
+                return uint(Error.INSUFFICIENT_LIQUIDITY);
+            }
         }
-        if (shortfall > 0) {
-            return uint(Error.INSUFFICIENT_LIQUIDITY);
-        }
-
-
 
         return uint(Error.NO_ERROR);
     }
@@ -453,13 +509,41 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
             require(borrowBalance >= repayAmount, "Can not repay more than the total borrow");
         } else {
             /* The borrower must have shortfall in order to be liquidatable */
-            (Error err, , uint shortfall) = getAccountLiquidityInternal(borrower);
-            if (err != Error.NO_ERROR) {
-                return uint(err);
-            }
+            if (separationModeEnabled) {
+                // In separation mode, check shortfall based on borrowed token type
+                TokenType borrowedTokenType = tokenTypes[bTokenBorrowed];
+                
+                (Error err, uint liquidityA, uint shortfallA, uint liquidityB, uint shortfallB) = 
+                    getHypotheticalAccountLiquidityInternalSeparated(borrower, BToken(address(0)), 0, 0);
+                
+                if (err != Error.NO_ERROR) {
+                    return uint(err);
+                }
+                
+                // Check shortfall for the appropriate type
+                uint relevantShortfall = 0;
+                if (borrowedTokenType == TokenType.TYPE_A) {
+                    relevantShortfall = shortfallB; // Type A borrows require Type B collateral
+                } else if (borrowedTokenType == TokenType.TYPE_B) {
+                    relevantShortfall = shortfallA; // Type B borrows require Type A collateral
+                } else {
+                    // UNCLASSIFIED tokens shouldn't be borrowable in separation mode
+                    return uint(Error.MARKET_NOT_LISTED);
+                }
+                
+                if (relevantShortfall == 0) {
+                    return uint(Error.INSUFFICIENT_SHORTFALL);
+                }
+            } else {
+                // Original logic for non-separation mode
+                (Error err, , uint shortfall) = getAccountLiquidityInternal(borrower);
+                if (err != Error.NO_ERROR) {
+                    return uint(err);
+                }
 
-            if (shortfall == 0) {
-                return uint(Error.INSUFFICIENT_SHORTFALL);
+                if (shortfall == 0) {
+                    return uint(Error.INSUFFICIENT_SHORTFALL);
+                }
             }
 
             /* The liquidator may not repay more than what is allowed by the closeFactor */
@@ -625,6 +709,18 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
     }
 
     /**
+     * @dev Separate liquidity calculation results for A/B token separation mode
+     */
+    struct SeparatedLiquidityLocalVars {
+        uint sumCollateralA;      // Type A collateral
+        uint sumCollateralB;      // Type B collateral
+        uint sumBorrowA;          // Type A borrow
+        uint sumBorrowB;          // Type B borrow
+        uint sumBorrowPlusEffectsA; // Type A borrow plus effects
+        uint sumBorrowPlusEffectsB; // Type B borrow plus effects
+    }
+
+    /**
      * @notice Determine the current account liquidity wrt collateral requirements
      * @return (possible error code (semi-opaque),
                 account liquidity in excess of collateral requirements,
@@ -733,6 +829,137 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
         } else {
             return (Error.NO_ERROR, 0, vars.sumBorrowPlusEffects - vars.sumCollateral);
         }
+    }
+
+    /**
+     * @notice Helper function to process a single asset for separated liquidity calculation
+     */
+    function _processSeparatedAsset(
+        BToken asset,
+        address account,
+        SeparatedLiquidityLocalVars memory sepVars
+    ) internal view returns (Error) {
+        (uint oErr, uint bTokenBalance, uint borrowBalance, uint exchangeRateMantissa) = asset.getAccountSnapshot(account);
+        if (oErr != 0) {
+            return Error.SNAPSHOT_ERROR;
+        }
+
+        uint oraclePriceMantissa = oracle.getUnderlyingPrice(asset);
+        if (oraclePriceMantissa == 0) {
+            return Error.PRICE_ERROR;
+        }
+
+        uint collateralFactorMantissa = markets[address(asset)].collateralFactorMantissa;
+        
+        // Calculate collateral and borrow values
+        uint collateralValue = mul_ScalarTruncate(
+            mul_(mul_(Exp({mantissa: collateralFactorMantissa}), Exp({mantissa: exchangeRateMantissa})), Exp({mantissa: oraclePriceMantissa})),
+            bTokenBalance
+        );
+        uint borrowValue = mul_ScalarTruncate(Exp({mantissa: oraclePriceMantissa}), borrowBalance);
+
+        // Accumulate by token type (only TYPE_A and TYPE_B participate in separation mode)
+        TokenType tokenType = tokenTypes[address(asset)];
+        if (tokenType == TokenType.TYPE_A) {
+            sepVars.sumCollateralA += collateralValue;
+            sepVars.sumBorrowA += borrowValue;
+            sepVars.sumBorrowPlusEffectsA = sepVars.sumBorrowA;
+        } else if (tokenType == TokenType.TYPE_B) {
+            sepVars.sumCollateralB += collateralValue;
+            sepVars.sumBorrowB += borrowValue;
+            sepVars.sumBorrowPlusEffectsB = sepVars.sumBorrowB;
+        }
+        // Non-classified tokens (default value 0) are ignored in separation mode
+
+        return Error.NO_ERROR;
+    }
+
+    /**
+     * @notice Helper function to apply hypothetical changes to separated liquidity
+     */
+    function _applySeparatedEffects(
+        BToken bTokenModify,
+        address account,
+        uint redeemTokens,
+        uint borrowAmount,
+        SeparatedLiquidityLocalVars memory sepVars
+    ) internal view returns (Error) {
+        if (address(bTokenModify) == address(0)) {
+            return Error.NO_ERROR;
+        }
+
+        (, , , uint exchangeRateMantissa) = bTokenModify.getAccountSnapshot(account);
+        uint oraclePriceMantissa = oracle.getUnderlyingPrice(bTokenModify);
+        if (oraclePriceMantissa == 0) {
+            return Error.PRICE_ERROR;
+        }
+
+        uint collateralFactorMantissa = markets[address(bTokenModify)].collateralFactorMantissa;
+        TokenType tokenType = tokenTypes[address(bTokenModify)];
+
+        if (tokenType == TokenType.TYPE_A) {
+            sepVars.sumBorrowPlusEffectsA += mul_ScalarTruncate(
+                mul_(mul_(Exp({mantissa: collateralFactorMantissa}), Exp({mantissa: exchangeRateMantissa})), Exp({mantissa: oraclePriceMantissa})),
+                redeemTokens
+            );
+            sepVars.sumBorrowPlusEffectsA += mul_ScalarTruncate(Exp({mantissa: oraclePriceMantissa}), borrowAmount);
+        } else if (tokenType == TokenType.TYPE_B) {
+            sepVars.sumBorrowPlusEffectsB += mul_ScalarTruncate(
+                mul_(mul_(Exp({mantissa: collateralFactorMantissa}), Exp({mantissa: exchangeRateMantissa})), Exp({mantissa: oraclePriceMantissa})),
+                redeemTokens
+            );
+            sepVars.sumBorrowPlusEffectsB += mul_ScalarTruncate(Exp({mantissa: oraclePriceMantissa}), borrowAmount);
+        }
+
+        return Error.NO_ERROR;
+    }
+
+    /**
+     * @notice Determine what the account liquidity would be with A/B separation mode
+     * @param account The account to determine liquidity for
+     * @param bTokenModify The market to hypothetically redeem/borrow in
+     * @param redeemTokens The number of tokens to hypothetically redeem
+     * @param borrowAmount The amount of underlying to hypothetically borrow
+     * @return (possible error code,
+                Type A liquidity,
+                Type A shortfall,
+                Type B liquidity,
+                Type B shortfall)
+     */
+    function getHypotheticalAccountLiquidityInternalSeparated(
+        address account,
+        BToken bTokenModify,
+        uint redeemTokens,
+        uint borrowAmount) internal view returns (Error, uint, uint, uint, uint) {
+
+        SeparatedLiquidityLocalVars memory sepVars;
+
+        // Process each asset
+        BToken[] memory assets = accountAssets[account];
+        for (uint i = 0; i < assets.length; i++) {
+            Error assetErr = _processSeparatedAsset(assets[i], account, sepVars);
+            if (assetErr != Error.NO_ERROR) {
+                return (assetErr, 0, 0, 0, 0);
+            }
+        }
+
+        // Apply hypothetical effects
+        Error effectsErr = _applySeparatedEffects(bTokenModify, account, redeemTokens, borrowAmount, sepVars);
+        if (effectsErr != Error.NO_ERROR) {
+            return (effectsErr, 0, 0, 0, 0);
+        }
+
+        // Calculate final results
+        uint liquidityA = sepVars.sumCollateralA > sepVars.sumBorrowPlusEffectsB ? 
+            sepVars.sumCollateralA - sepVars.sumBorrowPlusEffectsB : 0;
+        uint shortfallA = sepVars.sumBorrowPlusEffectsB > sepVars.sumCollateralA ? 
+            sepVars.sumBorrowPlusEffectsB - sepVars.sumCollateralA : 0;
+        uint liquidityB = sepVars.sumCollateralB > sepVars.sumBorrowPlusEffectsA ? 
+            sepVars.sumCollateralB - sepVars.sumBorrowPlusEffectsA : 0;
+        uint shortfallB = sepVars.sumBorrowPlusEffectsA > sepVars.sumCollateralB ? 
+            sepVars.sumBorrowPlusEffectsA - sepVars.sumCollateralB : 0;
+
+        return (Error.NO_ERROR, liquidityA, shortfallA, liquidityB, shortfallB);
     }
 
     /**
@@ -1052,6 +1279,98 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
 
     function getBlockNumber() virtual public view returns (uint) {
         return block.number;
+    }
+
+    /**
+     * @notice Admin function to set token type for A/B classification
+     * @param bToken The bToken to classify
+     * @param tokenType The type to assign (UNCLASSIFIED, TYPE_A, or TYPE_B)
+     * @return uint 0=success, otherwise a failure
+     */
+    function _setTokenType(BToken bToken, TokenType tokenType) external returns (uint) {
+        // Check caller is admin
+        if (msg.sender != admin) {
+            return fail(Error.UNAUTHORIZED, FailureInfo.SET_COLLATERAL_FACTOR_OWNER_CHECK);
+        }
+
+        // Verify market is listed
+        if (!markets[address(bToken)].isListed) {
+            return fail(Error.MARKET_NOT_LISTED, FailureInfo.SET_COLLATERAL_FACTOR_NO_EXISTS);
+        }
+
+        // Store old type for event
+        TokenType oldType = tokenTypes[address(bToken)];
+        
+        // Set new type
+        tokenTypes[address(bToken)] = tokenType;
+
+        // Emit event
+        emit TokenTypeSet(address(bToken), oldType, tokenType);
+
+        return uint(Error.NO_ERROR);
+    }
+
+    /**
+     * @notice Admin function to toggle A/B separation mode
+     * @param enabled Whether to enable separation mode
+     * @return uint 0=success, otherwise a failure
+     */
+    function _setSeparationMode(bool enabled) external returns (uint) {
+        // Check caller is admin
+        if (msg.sender != admin) {
+            return fail(Error.UNAUTHORIZED, FailureInfo.SET_PAUSE_GUARDIAN_OWNER_CHECK);
+        }
+
+        // Store old mode for event
+        bool oldMode = separationModeEnabled;
+        
+        // Set new mode
+        separationModeEnabled = enabled;
+
+        // Emit event
+        emit SeparationModeToggled(oldMode, enabled);
+
+        return uint(Error.NO_ERROR);
+    }
+
+    /**
+     * @notice Get separated account liquidity information (A/B types)
+     * @param account The account to get liquidity for
+     * @return (error code, A liquidity, A shortfall, B liquidity, B shortfall)
+     */
+    function getAccountLiquiditySeparated(address account) public view returns (uint, uint, uint, uint, uint) {
+        if (!separationModeEnabled) {
+            return (uint(Error.COMPTROLLER_MISMATCH), 0, 0, 0, 0); // Reuse error for disabled mode
+        }
+        
+        (Error err, uint liquidityA, uint shortfallA, uint liquidityB, uint shortfallB) = 
+            getHypotheticalAccountLiquidityInternalSeparated(account, BToken(address(0)), 0, 0);
+        
+        return (uint(err), liquidityA, shortfallA, liquidityB, shortfallB);
+    }
+
+    /**
+     * @notice Get hypothetical separated account liquidity (A/B types)
+     * @param account The account to get liquidity for
+     * @param bTokenModify The market to hypothetically modify
+     * @param redeemTokens Number of tokens to hypothetically redeem
+     * @param borrowAmount Amount to hypothetically borrow
+     * @return (error code, A liquidity, A shortfall, B liquidity, B shortfall)
+     */
+    function getHypotheticalAccountLiquiditySeparated(
+        address account,
+        address bTokenModify,
+        uint redeemTokens,
+        uint borrowAmount
+    ) public view returns (uint, uint, uint, uint, uint) {
+        if (!separationModeEnabled) {
+            return (uint(Error.COMPTROLLER_MISMATCH), 0, 0, 0, 0); // Reuse error for disabled mode
+        }
+        
+        (Error err, uint liquidityA, uint shortfallA, uint liquidityB, uint shortfallB) = 
+            getHypotheticalAccountLiquidityInternalSeparated(account, BToken(bTokenModify), redeemTokens, borrowAmount);
+        
+        return (uint(err), liquidityA, shortfallA, liquidityB, shortfallB);
     }
 
 }

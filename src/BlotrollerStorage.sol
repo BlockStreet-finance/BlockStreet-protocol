@@ -94,4 +94,24 @@ contract BlotrollerStorage is UnitrollerAdminStorage {
 
     // @notice Borrow caps enforced by borrowAllowed for each bToken address. Defaults to zero which corresponds to unlimited borrowing.
     mapping(address => uint) public borrowCaps;
+
+    /// @notice Token classification system for A/B borrowing rules
+    /// @dev 0 = Type A, 1 = Type B.
+    enum TokenType { 
+        TYPE_A,        // 0: When deposited, can only borrow Type B tokens
+        TYPE_B         // 1: When deposited, can only borrow Type A tokens
+    }
+
+    /// @notice Mapping of bToken address to its classification type
+    mapping(address => TokenType) public tokenTypes;
+
+    /// @notice Whether the A/B separation mode is enabled
+    /// @dev When true, A/B tokens have separate liquidity pools
+    bool public separationModeEnabled;
+
+    /// @notice Event emitted when a token type is set
+    event TokenTypeSet(address indexed bToken, TokenType oldType, TokenType newType);
+
+    /// @notice Event emitted when separation mode is toggled
+    event SeparationModeToggled(bool oldMode, bool newMode);
 }
