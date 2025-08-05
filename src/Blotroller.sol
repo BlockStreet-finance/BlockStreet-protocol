@@ -883,35 +883,35 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
         uint redeemTokens,
         uint borrowAmount,
         SeparatedLiquidityLocalVars memory sepVars
-    ) internal view returns (Error) {
+    ) internal view returns (Error, SeparatedLiquidityLocalVars memory) {
         if (address(bTokenModify) == address(0)) {
-            return Error.NO_ERROR;
+            return (Error.NO_ERROR, sepVars);
         }
 
         (, , , uint exchangeRateMantissa) = bTokenModify.getAccountSnapshot(account);
         uint oraclePriceMantissa = oracle.getUnderlyingPrice(bTokenModify);
         if (oraclePriceMantissa == 0) {
-            return Error.PRICE_ERROR;
+            return (Error.PRICE_ERROR, sepVars);
         }
 
         uint collateralFactorMantissa = markets[address(bTokenModify)].collateralFactorMantissa;
         TokenType tokenType = tokenTypes[address(bTokenModify)];
 
         if (tokenType == TokenType.TYPE_A) {
-            sepVars.sumBorrowPlusEffectsA += mul_ScalarTruncate(
+            sepVars.sumCollateralA -= mul_ScalarTruncate(
                 mul_(mul_(Exp({mantissa: collateralFactorMantissa}), Exp({mantissa: exchangeRateMantissa})), Exp({mantissa: oraclePriceMantissa})),
                 redeemTokens
             );
             sepVars.sumBorrowPlusEffectsA += mul_ScalarTruncate(Exp({mantissa: oraclePriceMantissa}), borrowAmount);
         } else if (tokenType == TokenType.TYPE_B) {
-            sepVars.sumBorrowPlusEffectsB += mul_ScalarTruncate(
+            sepVars.sumCollateralB -= mul_ScalarTruncate(
                 mul_(mul_(Exp({mantissa: collateralFactorMantissa}), Exp({mantissa: exchangeRateMantissa})), Exp({mantissa: oraclePriceMantissa})),
                 redeemTokens
             );
             sepVars.sumBorrowPlusEffectsB += mul_ScalarTruncate(Exp({mantissa: oraclePriceMantissa}), borrowAmount);
         }
 
-        return Error.NO_ERROR;
+        return (Error.NO_ERROR, sepVars);
     }
 
     /**
@@ -944,20 +944,20 @@ contract Blotroller is BlotrollerStorage, BlotrollerInterface, BlotrollerErrorRe
         }
 
         // Apply hypothetical effects
-        Error effectsErr = _applySeparatedEffects(bTokenModify, account, redeemTokens, borrowAmount, sepVars);
+        (Error effectsErr, SeparatedLiquidityLocalVars memory updatedSepVars) = _applySeparatedEffects(bTokenModify, account, redeemTokens, borrowAmount, sepVars);
         if (effectsErr != Error.NO_ERROR) {
             return (effectsErr, 0, 0, 0, 0);
         }
 
         // Calculate final results
-        uint liquidityA = sepVars.sumCollateralA > sepVars.sumBorrowPlusEffectsB ? 
-            sepVars.sumCollateralA - sepVars.sumBorrowPlusEffectsB : 0;
-        uint shortfallA = sepVars.sumBorrowPlusEffectsB > sepVars.sumCollateralA ? 
-            sepVars.sumBorrowPlusEffectsB - sepVars.sumCollateralA : 0;
-        uint liquidityB = sepVars.sumCollateralB > sepVars.sumBorrowPlusEffectsA ? 
-            sepVars.sumCollateralB - sepVars.sumBorrowPlusEffectsA : 0;
-        uint shortfallB = sepVars.sumBorrowPlusEffectsA > sepVars.sumCollateralB ? 
-            sepVars.sumBorrowPlusEffectsA - sepVars.sumCollateralB : 0;
+        uint liquidityA = updatedSepVars.sumCollateralA > updatedSepVars.sumBorrowPlusEffectsB ? 
+            updatedSepVars.sumCollateralA - updatedSepVars.sumBorrowPlusEffectsB : 0;
+        uint shortfallA = updatedSepVars.sumBorrowPlusEffectsB > updatedSepVars.sumCollateralA ? 
+            updatedSepVars.sumBorrowPlusEffectsB - updatedSepVars.sumCollateralA : 0;
+        uint liquidityB = updatedSepVars.sumCollateralB > updatedSepVars.sumBorrowPlusEffectsA ? 
+            updatedSepVars.sumCollateralB - updatedSepVars.sumBorrowPlusEffectsA : 0;
+        uint shortfallB = updatedSepVars.sumBorrowPlusEffectsA > updatedSepVars.sumCollateralB ? 
+            updatedSepVars.sumBorrowPlusEffectsA - updatedSepVars.sumCollateralB : 0;
 
         return (Error.NO_ERROR, liquidityA, shortfallA, liquidityB, shortfallB);
     }
