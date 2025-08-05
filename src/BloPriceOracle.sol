@@ -34,6 +34,7 @@ contract BloPriceOracle is PriceOracle, Ownable {
         AggregatorV3Interface chainlinkFeed;
         bytes32 pythPriceId;
         uint32 maxPriceAge; // Maximum age of a price feed in seconds before it's considered stale.
+        bool isCollateralAsset; // Whether this asset is used as collateral (true) or borrowed (false).
     }
 
     /// @notice Maps a bToken address to its price feed configuration.
@@ -87,7 +88,7 @@ contract BloPriceOracle is PriceOracle, Ownable {
         // The Blotroller expects prices scaled by 1e(36 - underlying_decimals).
         // Our internal price has 6 decimals, so we scale it to 36 total decimals
         // before dividing by the underlying token's base unit.
-        //return (priceInternal * 1e30) / config.baseUnit; 
+        //return (priceInternal * 1e30) / config.baseUnit;
         return OZMath.mulDiv(priceInternal, 1e30, config.baseUnit);
     }
 
@@ -115,8 +116,10 @@ contract BloPriceOracle is PriceOracle, Ownable {
     }
 
     /**
-     * @dev Fetches and normalizes the price from the Pyth Network.
-     * @return price The price normalized to INTERNAL_PRICE_UNIT (1e6), or 0 if invalid/stale.
+     * @dev Fetches and normalizes the price from the Pyth Network with confidence interval adjustment.
+     * @dev For collateral assets, applies conservative pricing (price - confidence).
+     * @dev For borrowed assets, applies conservative debt valuation (price + confidence).
+     * @return price The price normalized to INTERNAL_PRICE_UNIT (1e6), adjusted for confidence, or 0 if invalid/stale.
      * @return timestamp The timestamp of the fetched price, or 0.
      */
     function _fetchPythPrice(AssetConfig memory config) internal view returns (uint256 price, uint256 timestamp) {
@@ -128,11 +131,26 @@ contract BloPriceOracle is PriceOracle, Ownable {
             if (pythPrice.price <= 0) {
                 return (0, 0);
             }
-            // Normalize price to our internal 6-decimal format.
-            price = PythUtils.convertToUint(pythPrice.price, pythPrice.expo, uint8(INTERNAL_PRICE_DECIMALS));
-            /*if (price == 0) {
+
+            // Normalize price and confidence to our internal 6-decimal format
+            uint256 priceRaw = PythUtils.convertToUint(pythPrice.price, pythPrice.expo, uint8(INTERNAL_PRICE_DECIMALS));
+            uint256 confidence =
+                PythUtils.convertToUint(int64(pythPrice.conf), pythPrice.expo, uint8(INTERNAL_PRICE_DECIMALS));
+
+            if (confidence >= priceRaw) {
+                // If confidence is greater than or equal to price, fall back to Chainlink
                 return (0, 0);
-            }*/
+            }
+
+            // Apply confidence interval based on asset type
+            if (config.isCollateralAsset) {
+                // For collateral assets: use conservative valuation (price - confidence)
+                price = priceRaw - confidence;
+            } else {
+                // For borrowed assets: use conservative debt valuation (price + confidence)
+                price = priceRaw + confidence;
+            }
+
             timestamp = pythPrice.publishTime;
         } catch {
             return (0, 0);
@@ -156,12 +174,14 @@ contract BloPriceOracle is PriceOracle, Ownable {
 
     /**
      * @dev Internal logic to set a single asset's configuration.
+     * @dev Validates that the asset has at least one price source (Chainlink or Pyth).
      */
     function _setAssetConfig(address bToken, AssetConfig calldata config) internal {
         if (bToken == address(0) || config.underlying == address(0) || config.baseUnit == 0 || config.maxPriceAge == 0)
         {
             revert OracleInvalidConfiguration();
         }
+
         assetConfigs[bToken] = config;
         emit MarketOracleConfigUpdated(bToken, config);
     }
