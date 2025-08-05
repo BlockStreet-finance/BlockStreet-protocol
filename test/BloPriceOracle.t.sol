@@ -78,11 +78,13 @@ contract BloPriceOracleTest is Test {
         oracle.setAssetConfigs(bTokens, configs);
         vm.stopPrank();
 
-        (address tslaUnderlying,,,,,) = oracle.assetConfigs(address(TSLA_BTOKEN));
+        (address tslaUnderlying,,,,,uint16 tslaMaxConf) = oracle.assetConfigs(address(TSLA_BTOKEN));
         assertEq(tslaUnderlying, TSLA_UNDERLYING);
+        assertEq(tslaMaxConf, 200, "TSLA maxConfidenceRatio should be 200");
 
-        (address usdtUnderlying,,,,,) = oracle.assetConfigs(address(USDT_BTOKEN));
+        (address usdtUnderlying,,,,,uint16 usdtMaxConf) = oracle.assetConfigs(address(USDT_BTOKEN));
         assertEq(usdtUnderlying, USDT_UNDERLYING);
+        assertEq(usdtMaxConf, 50, "USDT maxConfidenceRatio should be 50");
     }
 
     function test_Fail_NonOwnerCannotSetConfig() public {
@@ -110,20 +112,87 @@ contract BloPriceOracleTest is Test {
         vm.stopPrank();
     }
 
+    function test_SetAssetConfigWithZeroMaxConfidenceRatio() public {
+        vm.startPrank(owner);
+        address[] memory bTokens = new address[](1);
+        bTokens[0] = address(TSLA_BTOKEN);
+        BloPriceOracle.AssetConfig[] memory configs = new BloPriceOracle.AssetConfig[](1);
+        configs[0] = _createTslaConfig();
+        configs[0].maxConfidenceRatio = 0; // Valid: 0% means always fallback to Chainlink
+
+        oracle.setAssetConfigs(bTokens, configs);
+        
+        // Verify the configuration was set
+        (,,,,,uint16 maxConf) = oracle.assetConfigs(address(TSLA_BTOKEN));
+        assertEq(maxConf, 0, "maxConfidenceRatio should be 0");
+        
+        vm.stopPrank();
+    }
+
+    function test_Fail_SetAssetConfigWithExcessiveMaxConfidenceRatio() public {
+        vm.startPrank(owner);
+        address[] memory bTokens = new address[](1);
+        bTokens[0] = address(TSLA_BTOKEN);
+        BloPriceOracle.AssetConfig[] memory configs = new BloPriceOracle.AssetConfig[](1);
+        configs[0] = _createTslaConfig();
+        configs[0].maxConfidenceRatio = 10001; // Invalid: > 100%
+
+        vm.expectRevert(BloPriceOracle.OracleInvalidConfiguration.selector);
+        oracle.setAssetConfigs(bTokens, configs);
+        vm.stopPrank();
+    }
+
+    function test_SetAssetConfigWithValidMaxConfidenceRatios() public {
+        vm.startPrank(owner);
+        address[] memory bTokens = new address[](3);
+        bTokens[0] = address(TSLA_BTOKEN);
+        bTokens[1] = address(USDT_BTOKEN);
+        bTokens[2] = address(0x1234); // Mock third token
+
+        BloPriceOracle.AssetConfig[] memory configs = new BloPriceOracle.AssetConfig[](3);
+        configs[0] = _createTslaConfig();
+        configs[0].maxConfidenceRatio = 0; // Minimum: 0% (always fallback)
+        
+        configs[1] = _createUsdtConfig();
+        configs[1].maxConfidenceRatio = 10000; // Maximum: 100%
+        
+        configs[2] = BloPriceOracle.AssetConfig({
+            underlying: address(0x5678),
+            baseUnit: 1e18,
+            chainlinkFeed: AggregatorV3Interface(address(mockChainlinkTsla)),
+            pythPriceId: TSLA_PYTH_ID,
+            maxPriceAge: MAX_PRICE_AGE,
+            maxConfidenceRatio: 500 // 5%
+        });
+
+        oracle.setAssetConfigs(bTokens, configs);
+        
+        // Verify configurations were set correctly
+        (,,,,,uint16 maxConf1) = oracle.assetConfigs(bTokens[0]);
+        (,,,,,uint16 maxConf2) = oracle.assetConfigs(bTokens[1]);
+        (,,,,,uint16 maxConf3) = oracle.assetConfigs(bTokens[2]);
+        
+        assertEq(maxConf1, 0, "First asset should have 0% threshold (always fallback)");
+        assertEq(maxConf2, 10000, "Second asset should have 100% threshold");
+        assertEq(maxConf3, 500, "Third asset should have 5% threshold");
+        
+        vm.stopPrank();
+    }
+
     // ============================================================
     // Section: Price Selection Logic
     // ============================================================
 
     function test_PriceSelection_PrefersNewerPythPrice() public {
-        _setupTslaMarket(); // TSLA is collateral asset
+        _setupTslaMarket();
 
         mockChainlinkTsla.setPrice(250 * 1e8, block.timestamp - 10);
         mockPyth.setPrice(TSLA_PYTH_ID, 251 * 1e6, -6); // This sets conf = 1 by default
 
         uint256 price = oracle.getUnderlyingPrice(TSLA_BTOKEN);
 
-        // Expected: (251 - 1) * 1e6 = 250 * 1e6 (price - confidence for collateral)
-        uint256 priceInternal = (251 * 1e6) - 1; // 251000000 - 1 = 250999999
+        // Expected: 251 * 1e6 (uses raw price since confidence is within threshold)
+        uint256 priceInternal = 251 * 1e6;
         uint256 baseUnit = 1e8;
         uint256 expectedPrice = OZMath.mulDiv(priceInternal, 1e30, baseUnit);
 
@@ -195,9 +264,9 @@ contract BloPriceOracleTest is Test {
         mockPyth.setPrice(TSLA_PYTH_ID, 250 * 1e6, -6); // conf = 1 by default
 
         uint256 price1 = oracle.getUnderlyingPrice(TSLA_BTOKEN);
-        // Expected: (250 - 1) * 1e6 for collateral asset
-        uint256 expectedPrice1 = OZMath.mulDiv((250 * 1e6) - 1, 1e30, 1e8);
-        assertEq(price1, expectedPrice1, "Should ignore negative price and apply confidence interval");
+        // Expected: 250 * 1e6 (uses raw price since confidence is within threshold)
+        uint256 expectedPrice1 = OZMath.mulDiv(250 * 1e6, 1e30, 1e8);
+        assertEq(price1, expectedPrice1, "Should ignore negative price and use Pyth price");
 
         int256 smallPrice = 100; // $0.000001
         mockChainlinkTsla.setPrice(smallPrice);
@@ -216,41 +285,26 @@ contract BloPriceOracleTest is Test {
     // Section: Confidence Interval Tests
     // ============================================================
 
-    function test_ConfidenceInterval_CollateralAsset() public {
-        _setupTslaMarket(); // TSLA is configured as collateral asset
+    function test_ConfidenceRatio_BelowThreshold() public {
+        _setupTslaMarket(); // maxConfidenceRatio = 200 (2%)
 
-        // Set Pyth price with confidence: $250 ± $5
-        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 250 * 1e6, 5 * 1e6, -6);
+        // Set Pyth price with confidence: $250 ± $2.5 (1% confidence ratio)
+        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 250 * 1e6, 2500000, -6);
 
         uint256 price = oracle.getUnderlyingPrice(TSLA_BTOKEN);
         
-        // Expected: (250 - 5) * 1e6 = 245 * 1e6 (conservative pricing for collateral)
-        uint256 expectedPriceInternal = 245 * 1e6;
+        // Expected: 250 * 1e6 (uses raw price since confidence ratio is below threshold)
+        uint256 expectedPriceInternal = 250 * 1e6;
         uint256 expectedPrice = OZMath.mulDiv(expectedPriceInternal, 1e30, 1e8);
         
-        assertEq(price, expectedPrice, "Collateral asset should use price - confidence");
+        assertEq(price, expectedPrice, "Should use raw price when confidence ratio is below threshold");
     }
 
-    function test_ConfidenceInterval_BorrowedAsset() public {
-        _setupUsdtMarket(); // USDT is configured as borrowed asset
+    function test_ConfidenceRatio_AboveThreshold_FallbackToChainlink() public {
+        _setupTslaMarket(); // maxConfidenceRatio = 200 (2%)
 
-        // Set Pyth price with confidence: $1.00 ± $0.02
-        mockPyth.setPriceWithConfidence(USDT_PYTH_ID, 1000000, 20000, -6); // $1.000000 ± $0.020000
-
-        uint256 price = oracle.getUnderlyingPrice(USDT_BTOKEN);
-        
-        // Expected: (1.00 + 0.02) * 1e6 = 1.02 * 1e6 (conservative debt valuation)
-        uint256 expectedPriceInternal = 1020000;
-        uint256 expectedPrice = OZMath.mulDiv(expectedPriceInternal, 1e30, 1e6);
-        
-        assertEq(price, expectedPrice, "Borrowed asset should use price + confidence");
-    }
-
-    function test_ConfidenceInterval_FallbackWhenConfidenceExceedsPrice() public {
-        _setupTslaMarket();
-
-        // Set extreme confidence that exceeds price: $100 ± $150
-        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 100 * 1e6, 150 * 1e6, -6);
+        // Set Pyth price with confidence: $100 ± $5 (5% confidence ratio - above 2% threshold)
+        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 100 * 1e6, 5 * 1e6, -6);
         // Also set Chainlink as fallback
         mockChainlinkTsla.setPrice(105 * 1e8, block.timestamp - 5);
 
@@ -260,80 +314,131 @@ contract BloPriceOracleTest is Test {
         uint256 expectedPriceInternal = 105 * 1e6;
         uint256 expectedPrice = OZMath.mulDiv(expectedPriceInternal, 1e30, 1e8);
         
-        assertEq(price, expectedPrice, "Should fallback to Chainlink when confidence >= price");
+        assertEq(price, expectedPrice, "Should fallback to Chainlink when confidence ratio exceeds threshold");
     }
 
-    function test_ConfidenceInterval_NormalOperationWithSmallConfidence() public {
-        _setupTslaMarket();
+    function test_ConfidenceRatio_ExactlyAtThreshold() public {
+        _setupTslaMarket(); // maxConfidenceRatio = 200 (2%)
 
-        // Set normal confidence: $250 ± $1 (0.4% confidence)
-        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 250 * 1e6, 1 * 1e6, -6);
+        // Set Pyth price with confidence: $100 ± $2 (exactly 2% confidence ratio)
+        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 100 * 1e6, 2 * 1e6, -6);
 
         uint256 price = oracle.getUnderlyingPrice(TSLA_BTOKEN);
         
-        // Expected: (250 - 1) * 1e6 = 249 * 1e6
-        uint256 expectedPriceInternal = 249 * 1e6;
+        // Expected: 100 * 1e6 (uses raw price since confidence ratio equals threshold)
+        uint256 expectedPriceInternal = 100 * 1e6;
         uint256 expectedPrice = OZMath.mulDiv(expectedPriceInternal, 1e30, 1e8);
         
-        assertEq(price, expectedPrice, "Normal confidence should work correctly");
+        assertEq(price, expectedPrice, "Should use raw price when confidence ratio equals threshold");
     }
 
-    function test_ConfidenceInterval_BorrowedAssetWithHighButReasonableConfidence() public {
-        // Setup TSLA as borrowed asset for this test
+    function test_ConfidenceRatio_VeryHighThreshold() public {
+        // Setup with very high threshold (50% = 5000 basis points)
         vm.startPrank(owner);
         address[] memory bTokens = new address[](1);
         bTokens[0] = address(TSLA_BTOKEN);
         BloPriceOracle.AssetConfig[] memory configs = new BloPriceOracle.AssetConfig[](1);
-        configs[0] = _createTslaConfigAsBorrowed();
+        configs[0] = BloPriceOracle.AssetConfig({
+            underlying: TSLA_UNDERLYING,
+            baseUnit: 1e8,
+            chainlinkFeed: AggregatorV3Interface(address(mockChainlinkTsla)),
+            pythPriceId: TSLA_PYTH_ID,
+            maxPriceAge: MAX_PRICE_AGE,
+            maxConfidenceRatio: 5000 // 50%
+        });
         oracle.setAssetConfigs(bTokens, configs);
         vm.stopPrank();
 
-        // Set high but reasonable confidence: $100 ± $50 (50% confidence - high volatility but reasonable)
-        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 100 * 1e6, 50 * 1e6, -6);
+        // Set high confidence: $100 ± $40 (40% confidence ratio - still below 50% threshold)
+        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 100 * 1e6, 40 * 1e6, -6);
 
         uint256 price = oracle.getUnderlyingPrice(TSLA_BTOKEN);
         
-        // Expected: (100 + 50) * 1e6 = 150 * 1e6 (conservative debt valuation)
-        uint256 expectedPriceInternal = 150 * 1e6;
+        // Expected: 100 * 1e6 (uses raw price since confidence ratio is below threshold)
+        uint256 expectedPriceInternal = 100 * 1e6;
         uint256 expectedPrice = OZMath.mulDiv(expectedPriceInternal, 1e30, 1e8);
         
-        assertEq(price, expectedPrice, "Borrowed asset should use price + confidence for reasonable confidence levels");
+        assertEq(price, expectedPrice, "Should use raw price when confidence ratio is below high threshold");
     }
 
-    function test_ConfidenceInterval_BothAssetTypesFallbackWhenConfidenceExceedsPrice() public {
-        // Test that both collateral and borrowed assets fallback when confidence >= price
+    function test_ConfidenceRatio_MultipleAssets_DifferentThresholds() public {
+        // Setup assets with different confidence thresholds
         vm.startPrank(owner);
         
-        // Setup both asset types
         address[] memory bTokens = new address[](2);
-        bTokens[0] = address(TSLA_BTOKEN);  // Will be collateral
-        bTokens[1] = address(USDT_BTOKEN);  // Will be borrowed
+        bTokens[0] = address(TSLA_BTOKEN);
+        bTokens[1] = address(USDT_BTOKEN);
         
         BloPriceOracle.AssetConfig[] memory configs = new BloPriceOracle.AssetConfig[](2);
-        configs[0] = _createTslaConfig();    // isCollateralAsset = true
-        configs[1] = _createUsdtConfig();    // isCollateralAsset = false
+        configs[0] = BloPriceOracle.AssetConfig({
+            underlying: TSLA_UNDERLYING,
+            baseUnit: 1e8,
+            chainlinkFeed: AggregatorV3Interface(address(mockChainlinkTsla)),
+            pythPriceId: TSLA_PYTH_ID,
+            maxPriceAge: MAX_PRICE_AGE,
+            maxConfidenceRatio: 200 // 2% for TSLA
+        });
+        configs[1] = BloPriceOracle.AssetConfig({
+            underlying: USDT_UNDERLYING,
+            baseUnit: 1e6,
+            chainlinkFeed: AggregatorV3Interface(address(mockChainlinkUsdt)),
+            pythPriceId: USDT_PYTH_ID,
+            maxPriceAge: MAX_PRICE_AGE,
+            maxConfidenceRatio: 50 // 0.5% for USDT (stablecoin, tighter threshold)
+        });
         
         oracle.setAssetConfigs(bTokens, configs);
         vm.stopPrank();
 
-        // Set unreasonable confidence for both: price ± (price + 1)
-        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 100 * 1e6, 101 * 1e6, -6);  // $100 ± $101
-        mockPyth.setPriceWithConfidence(USDT_PYTH_ID, 1000000, 1000001, -6);        // $1.00 ± $1.000001
+        // Set same confidence ratio for both: 1%
+        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 100 * 1e6, 1 * 1e6, -6);  // $100 ± $1 (1%)
+        mockPyth.setPriceWithConfidence(USDT_PYTH_ID, 1000000, 10000, -6);       // $1.00 ± $0.01 (1%)
         
-        // Set Chainlink as fallback for both
-        mockChainlinkTsla.setPrice(105 * 1e8);
-        mockChainlinkUsdt.setPrice(1010000); // $1.01 in 6 decimals
+        // Set Chainlink as fallback (older timestamp to ensure Pyth is selected first)
+        mockChainlinkTsla.setPrice(105 * 1e8, block.timestamp - 10);
+        mockChainlinkUsdt.setPrice(1010000, block.timestamp - 10);
 
-        // Both should fallback to Chainlink
         uint256 tslaPrice = oracle.getUnderlyingPrice(TSLA_BTOKEN);
         uint256 usdtPrice = oracle.getUnderlyingPrice(USDT_BTOKEN);
         
-        // Expected Chainlink prices (no confidence adjustment)
-        uint256 expectedTslaPrice = OZMath.mulDiv(105 * 1e6, 1e30, 1e8);
+        // TSLA: 1% < 2% threshold, so uses Pyth price
+        uint256 expectedTslaPrice = OZMath.mulDiv(100 * 1e6, 1e30, 1e8);
+        // USDT: 1% > 0.5% threshold, so fallback to Chainlink
         uint256 expectedUsdtPrice = OZMath.mulDiv(1010000, 1e30, 1e6);
         
-        assertEq(tslaPrice, expectedTslaPrice, "Collateral asset should fallback when confidence >= price");
-        assertEq(usdtPrice, expectedUsdtPrice, "Borrowed asset should also fallback when confidence >= price");
+        assertEq(tslaPrice, expectedTslaPrice, "TSLA should use Pyth price (within threshold)");
+        assertEq(usdtPrice, expectedUsdtPrice, "USDT should fallback to Chainlink (exceeds threshold)");
+    }
+
+    function test_ConfidenceRatio_ZeroThreshold_AlwaysFallback() public {
+        // Setup with zero threshold (always fallback to Chainlink)
+        vm.startPrank(owner);
+        address[] memory bTokens = new address[](1);
+        bTokens[0] = address(TSLA_BTOKEN);
+        BloPriceOracle.AssetConfig[] memory configs = new BloPriceOracle.AssetConfig[](1);
+        configs[0] = BloPriceOracle.AssetConfig({
+            underlying: TSLA_UNDERLYING,
+            baseUnit: 1e8,
+            chainlinkFeed: AggregatorV3Interface(address(mockChainlinkTsla)),
+            pythPriceId: TSLA_PYTH_ID,
+            maxPriceAge: MAX_PRICE_AGE,
+            maxConfidenceRatio: 0 // 0% means always fallback to Chainlink
+        });
+        oracle.setAssetConfigs(bTokens, configs);
+        vm.stopPrank();
+
+        // Set very small confidence: $100 ± $0.01 (0.01% confidence ratio)
+        mockPyth.setPriceWithConfidence(TSLA_PYTH_ID, 100 * 1e6, 10000, -6); // $100 ± $0.01
+        // Set Chainlink price (older timestamp to ensure Pyth would normally be selected)
+        mockChainlinkTsla.setPrice(105 * 1e8, block.timestamp - 10);
+
+        uint256 price = oracle.getUnderlyingPrice(TSLA_BTOKEN);
+        
+        // Should always fallback to Chainlink price: $105, regardless of confidence
+        uint256 expectedPriceInternal = 105 * 1e6;
+        uint256 expectedPrice = OZMath.mulDiv(expectedPriceInternal, 1e30, 1e8);
+        
+        assertEq(price, expectedPrice, "Should always fallback to Chainlink when maxConfidenceRatio is 0");
     }
 
     // ============================================================
@@ -347,7 +452,7 @@ contract BloPriceOracleTest is Test {
             chainlinkFeed: AggregatorV3Interface(address(mockChainlinkTsla)),
             pythPriceId: TSLA_PYTH_ID,
             maxPriceAge: MAX_PRICE_AGE,
-            isCollateralAsset: true // TSLA as collateral asset
+            maxConfidenceRatio: 200 // 2% threshold for TSLA
         });
     }
 
@@ -358,18 +463,7 @@ contract BloPriceOracleTest is Test {
             chainlinkFeed: AggregatorV3Interface(address(mockChainlinkUsdt)),
             pythPriceId: USDT_PYTH_ID,
             maxPriceAge: MAX_PRICE_AGE,
-            isCollateralAsset: false // USDT as borrowed asset
-        });
-    }
-
-    function _createTslaConfigAsBorrowed() internal view returns (BloPriceOracle.AssetConfig memory) {
-        return BloPriceOracle.AssetConfig({
-            underlying: TSLA_UNDERLYING,
-            baseUnit: 1e8,
-            chainlinkFeed: AggregatorV3Interface(address(mockChainlinkTsla)),
-            pythPriceId: TSLA_PYTH_ID,
-            maxPriceAge: MAX_PRICE_AGE,
-            isCollateralAsset: false // TSLA as borrowed asset for testing
+            maxConfidenceRatio: 50 // 0.5% threshold for USDT (stablecoin)
         });
     }
 
