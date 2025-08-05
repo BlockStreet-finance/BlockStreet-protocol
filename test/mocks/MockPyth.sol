@@ -25,6 +25,16 @@ contract MockPyth is IPyth {
         });
     }
 
+    // Enhanced helper function to set price with custom confidence
+    function setPriceWithConfidence(bytes32 id, int64 price, uint64 conf, int32 expo) public {
+        prices[id] = PythStructs.Price({
+            price: price,
+            conf: conf,
+            expo: expo,
+            publishTime: uint64(block.timestamp)
+        });
+    }
+
     function getPriceUnsafe(bytes32 id) external view override returns (PythStructs.Price memory) {
         return prices[id];
     }
