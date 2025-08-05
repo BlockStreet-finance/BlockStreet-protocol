@@ -34,7 +34,7 @@ contract BloPriceOracle is PriceOracle, Ownable {
         AggregatorV3Interface chainlinkFeed;
         bytes32 pythPriceId;
         uint32 maxPriceAge; // Maximum age of a price feed in seconds before it's considered stale.
-        bool isCollateralAsset; // Whether this asset is used as collateral (true) or borrowed (false).
+        uint16 maxConfidenceRatio; // Maximum allowed confidence/price ratio in basis points (e.g., 200 = 2%)
     }
 
     /// @notice Maps a bToken address to its price feed configuration.
@@ -116,10 +116,9 @@ contract BloPriceOracle is PriceOracle, Ownable {
     }
 
     /**
-     * @dev Fetches and normalizes the price from the Pyth Network with confidence interval adjustment.
-     * @dev For collateral assets, applies conservative pricing (price - confidence).
-     * @dev For borrowed assets, applies conservative debt valuation (price + confidence).
-     * @return price The price normalized to INTERNAL_PRICE_UNIT (1e6), adjusted for confidence, or 0 if invalid/stale.
+     * @dev Fetches and normalizes the price from the Pyth Network with confidence interval validation.
+     * @dev Uses confidence ratio threshold to determine data quality and fallback behavior.
+     * @return price The price normalized to INTERNAL_PRICE_UNIT (1e6), or 0 if confidence exceeds threshold.
      * @return timestamp The timestamp of the fetched price, or 0.
      */
     function _fetchPythPrice(AssetConfig memory config) internal view returns (uint256 price, uint256 timestamp) {
@@ -137,20 +136,16 @@ contract BloPriceOracle is PriceOracle, Ownable {
             uint256 confidence =
                 PythUtils.convertToUint(int64(pythPrice.conf), pythPrice.expo, uint8(INTERNAL_PRICE_DECIMALS));
 
-            if (confidence >= priceRaw) {
-                // If confidence is greater than or equal to price, fall back to Chainlink
-                return (0, 0);
+            // Calculate confidence ratio in basis points (10000 = 100%)
+            uint256 confidenceRatio = (confidence * 10000) / priceRaw;
+
+            // if confidence ratio exceeds threshold, fallback to Chainlink
+            if (confidenceRatio > config.maxConfidenceRatio) {
+                return (0, 0); // Fallback to Chainlink
             }
 
-            // Apply confidence interval based on asset type
-            if (config.isCollateralAsset) {
-                // For collateral assets: use conservative valuation (price - confidence)
-                price = priceRaw - confidence;
-            } else {
-                // For borrowed assets: use conservative debt valuation (price + confidence)
-                price = priceRaw + confidence;
-            }
-
+            // Otherwise, use the raw price directly
+            price = priceRaw;
             timestamp = pythPrice.publishTime;
         } catch {
             return (0, 0);
@@ -179,6 +174,12 @@ contract BloPriceOracle is PriceOracle, Ownable {
     function _setAssetConfig(address bToken, AssetConfig calldata config) internal {
         if (bToken == address(0) || config.underlying == address(0) || config.baseUnit == 0 || config.maxPriceAge == 0)
         {
+            revert OracleInvalidConfiguration();
+        }
+
+        // Validate confidence ratio threshold (should be between 0% and 100%)
+        // Note: 0 means always fallback to Chainlink (never use Pyth)
+        if (config.maxConfidenceRatio > 10000) {
             revert OracleInvalidConfiguration();
         }
 
