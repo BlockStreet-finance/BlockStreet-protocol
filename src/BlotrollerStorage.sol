@@ -26,7 +26,7 @@ contract UnitrollerAdminStorage {
     address public pendingBlotrollerImplementation;
 }
 
-contract BlotrollerV1Storage is UnitrollerAdminStorage {
+contract BlotrollerStorage is UnitrollerAdminStorage {
 
     /**
      * @notice Oracle which gives the price of any given asset
@@ -53,9 +53,6 @@ contract BlotrollerV1Storage is UnitrollerAdminStorage {
      */
     mapping(address => BToken[]) public accountAssets;
 
-}
-
-contract BlotrollerV2Storage is BlotrollerV1Storage {
     struct Market {
         // Whether or not this market is listed
         bool isListed;
@@ -76,7 +73,6 @@ contract BlotrollerV2Storage is BlotrollerV1Storage {
      */
     mapping(address => Market) public markets;
 
-
     /**
      * @notice The Pause Guardian can pause certain actions as a safety mechanism.
      *  Actions which allow users to remove their own assets cannot be paused.
@@ -89,26 +85,33 @@ contract BlotrollerV2Storage is BlotrollerV1Storage {
     bool public seizeGuardianPaused;
     mapping(address => bool) public mintGuardianPaused;
     mapping(address => bool) public borrowGuardianPaused;
-}
 
-contract BlotrollerV3Storage is BlotrollerV2Storage {
     /// @notice A list of all markets
     BToken[] public allMarkets;
-}
 
-contract BlotrollerV4Storage is BlotrollerV3Storage {
     // @notice The borrowCapGuardian can set borrowCaps to any number for any market. Lowering the borrow cap could disable borrowing on the given market.
     address public borrowCapGuardian;
 
     // @notice Borrow caps enforced by borrowAllowed for each bToken address. Defaults to zero which corresponds to unlimited borrowing.
     mapping(address => uint) public borrowCaps;
-}
 
-contract BlotrollerV5Storage is BlotrollerV4Storage {
-}
+    /// @notice Token classification system for A/B borrowing rules
+    /// @dev 0 = Type A, 1 = Type B.
+    enum TokenType { 
+        TYPE_A,        // 0: When deposited, can only borrow Type B tokens
+        TYPE_B         // 1: When deposited, can only borrow Type A tokens
+    }
 
-contract BlotrollerV6Storage is BlotrollerV5Storage {
-}
+    /// @notice Mapping of bToken address to its classification type
+    mapping(address => TokenType) public tokenTypes;
 
-contract BlotrollerV7Storage is BlotrollerV6Storage {
+    /// @notice Whether the A/B separation mode is enabled
+    /// @dev When true, A/B tokens have separate liquidity pools
+    bool public separationModeEnabled;
+
+    /// @notice Event emitted when a token type is set
+    event TokenTypeSet(address indexed bToken, TokenType oldType, TokenType newType);
+
+    /// @notice Event emitted when separation mode is toggled
+    event SeparationModeToggled(bool oldMode, bool newMode);
 }

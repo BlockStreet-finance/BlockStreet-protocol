@@ -37,11 +37,11 @@ contract MockERC20 {
     function transferFrom(address from, address to, uint256 value) external returns (bool) {
         require(balanceOf[from] >= value, "Insufficient balance");
         require(allowance[from][msg.sender] >= value, "Insufficient allowance");
-
+        
         balanceOf[from] -= value;
         balanceOf[to] += value;
         allowance[from][msg.sender] -= value;
-
+        
         emit Transfer(from, to, value);
         return true;
     }
@@ -57,4 +57,4 @@ contract MockERC20 {
         balanceOf[to] += value;
         emit Transfer(address(0), to, value);
     }
-}
+} 
