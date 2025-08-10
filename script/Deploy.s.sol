@@ -75,7 +75,7 @@ contract DeployScript is Script {
         console.log("Admin:", config.admin);
         
         // Deploy test tokens first (testnet only)
-        if (block.chainid == 97) {
+        if (block.chainid == 97 || block.chainid == 56) {
             _deployTestTokens();
         }
         
@@ -343,35 +343,36 @@ contract DeployScript is Script {
     
     function _saveDeploymentAddresses() internal {
         console.log("\n=== Saving Deployment Addresses ===");
-        
+        console.log("Network:", network);
+        console.log("Chain ID:", block.chainid);
+
         string memory networkKey = network;
         string memory addressesJson = "{}";
-        
+
         // Core contracts
         vm.serializeAddress(addressesJson, "unitroller", address(unitroller));
         vm.serializeAddress(addressesJson, "blotroller", address(blotroller));
         vm.serializeAddress(addressesJson, "priceOracle", address(priceOracle));
         vm.serializeAddress(addressesJson, "interestRateModel", address(interestRateModel));
         vm.serializeAddress(addressesJson, "bErc20Delegate", address(bErc20Delegate));
-        
+
         // Market contracts
         vm.serializeAddress(addressesJson, "bUSDC", address(bUSDC));
-        vm.serializeAddress(addressesJson, "bTSLA", address(bTSLA));
-        
-        // Test tokens (testnet only)
-        if (block.chainid == 97) {
-            if (address(mockUSDC) != address(0)) {
-                vm.serializeAddress(addressesJson, "mockUSDC", address(mockUSDC));
-            }
-            if (address(mockTSLA) != address(0)) {
-                addressesJson = vm.serializeAddress(addressesJson, "mockTSLA", address(mockTSLA));
-            }
-        }
-        
+        addressesJson = vm.serializeAddress(addressesJson, "bTSLA", address(bTSLA));
+
+        console.log("Serialized JSON length:", bytes(addressesJson).length);
+
         // Write to file
         string memory fileName = string.concat("deployments/", networkKey, "-latest.json");
-        vm.writeJson(addressesJson, fileName);
-        console.log("Addresses saved to:", fileName);
+        console.log("Attempting to write to:", fileName);
+
+        try vm.writeJson(addressesJson, fileName) {
+            console.log("Addresses saved successfully to:", fileName);
+        } catch Error(string memory reason) {
+            console.log("Failed to save addresses:", reason);
+        } catch {
+            console.log("Failed to save addresses: Unknown error");
+        }
     }
     
     function _logDeployment() internal view {

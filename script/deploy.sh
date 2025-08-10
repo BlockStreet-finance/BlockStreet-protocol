@@ -35,7 +35,7 @@ if [ "$ENVIRONMENT" = "testnet" ]; then
     ETHERSCAN_API_KEY="$BSCSCAN_TESTNET_API_KEY"
     echo "🚀 Deploying to BSC Testnet..."
 elif [ "$ENVIRONMENT" = "mainnet" ]; then
-    NETWORK_FLAG="--rpc-url ${BSC_MAINNET_RPC:-https://bsc-dataseed.binance.org/} --with-gas-price 100000000"
+    NETWORK_FLAG="--rpc-url ${BSC_MAINNET_RPC:-https://bsc-dataseed.binance.org/} --with-gas-price 200000000"
     ETHERSCAN_API_KEY="$BSCSCAN_API_KEY"
     echo "🚀 Deploying to BSC Mainnet..."
     echo "⚠️  WARNING: This is MAINNET deployment!"
@@ -77,10 +77,12 @@ DEPLOY_CMD="forge script script/Deploy.s.sol:DeployScript \
     --broadcast \
     -vvvv"
 
-if [ "$VERIFY_FLAG" = "--verify" ] && [ "$ENVIRONMENT" = "testnet" ]; then
-    DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url https://api.etherscan.io/v2/api?chainid=97 --etherscan-api-key $ETHERSCAN_API_KEY"
-else
-    DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url https://api.etherscan.io/v2/api?chainid=56 --etherscan-api-key $ETHERSCAN_API_KEY"
+if [ "$VERIFY_FLAG" = "--verify" ]; then
+  if [ "$ENVIRONMENT" = "testnet" ]; then
+        DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url https://api.etherscan.io/v2/api?chainid=97 --etherscan-api-key $ETHERSCAN_API_KEY"
+  else
+        DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url https://api.etherscan.io/v2/api?chainid=56 --etherscan-api-key $ETHERSCAN_API_KEY"
+  fi
 fi
 
 echo "Executing: $DEPLOY_CMD"
