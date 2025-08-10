@@ -1,0 +1,89 @@
+{
+  "networks": {
+    "bsc_testnet": {
+      "name": "BSC Testnet",
+      "chainId": 97,
+      "rpcUrl": "https://data-seed-prebsc-1-s1.binance.org:8545/",
+      "blockExplorer": "https://testnet.bscscan.com"
+    },
+    "bsc_mainnet": {
+      "name": "BSC Mainnet", 
+      "chainId": 56,
+      "rpcUrl": "https://bsc-dataseed.binance.org/",
+      "blockExplorer": "https://bscscan.com"
+    }
+  },
+  "deployedContracts": {
+    "testnet": {
+      "unitroller": "0x0000000000000000000000000000000000000000",
+      "blotroller": "0x0000000000000000000000000000000000000000",
+      "priceOracle": "0x0000000000000000000000000000000000000000",
+      "interestRateModel": "0x0000000000000000000000000000000000000000",
+      "bErc20Delegate": "0x0000000000000000000000000000000000000000",
+      "bUSDC": "0x0000000000000000000000000000000000000000",
+      "bTSLA": "0x0000000000000000000000000000000000000000",
+      "mockUSDC": "0x0000000000000000000000000000000000000000",
+      "mockTSLA": "0x0000000000000000000000000000000000000000"
+    },
+    "mainnet": {
+      "unitroller": "0x0000000000000000000000000000000000000000",
+      "blotroller": "0x0000000000000000000000000000000000000000",
+      "priceOracle": "0x0000000000000000000000000000000000000000",
+      "interestRateModel": "0x0000000000000000000000000000000000000000",
+      "bErc20Delegate": "0x0000000000000000000000000000000000000000",
+      "bUSDC": "0x0000000000000000000000000000000000000000",
+      "bTSLA": "0x0000000000000000000000000000000000000000"
+    }
+  },
+  "protocol": {
+    "closeFactor": "500000000000000000",
+    "liquidationIncentive": "1080000000000000000",
+    "maxAssets": 10,
+    "comment": "closeFactor: 50% (0.5 * 1e18), liquidationIncentive: 108% (1.08 * 1e18)"
+  },
+  "governance": {
+    "admin": "0x6a5ce9Ff5228cEb2Ab44FA7C44E3619C18d3044e",
+    "pauseGuardian": "0x6a5ce9Ff5228cEb2Ab44FA7C44E3619C18d3044e",
+    "borrowCapGuardian": "0x6a5ce9Ff5228cEb2Ab44FA7C44E3619C18d3044e",
+    "comment": "Replace these addresses with your Safe multisig wallet addresses before deployment"
+  },
+  "interestRateModel": {
+    "baseRatePerYear": "20000000000000000",
+    "multiplierPerYear": "200000000000000000", 
+    "jumpMultiplierPerYear": "2000000000000000000",
+    "kink": "800000000000000000",
+    "comment": "Base: 2% APY, Multiplier: 20% APY, Jump: 200% APY, Kink: 80%"
+  },
+  "markets": {
+    "USDC": {
+      "name": "BlockStreet USDC",
+      "symbol": "bUSDC",
+      "decimals": 8,
+      "underlying": {
+        "testnet": "0x64544969ed7EBf5f083679233325356EbE738930",
+        "mainnet": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+      },
+      "collateralFactor": "800000000000000000",
+      "reserveFactor": "100000000000000000", 
+      "borrowCap": "10000000000000000000000000",
+      "initialExchangeRate": "200000000000000000000000000",
+      "initialPrice": "1000000000000000000",
+      "comment": "Collateral: 80%, Reserve: 10%, BorrowCap: 10M USDC, Price: $1"
+    },
+    "TSLA": {
+      "name": "BlockStreet Tesla Stock Token",
+      "symbol": "bTSLA",
+      "decimals": 8,
+      "underlying": {
+        "testnet": "0x0000000000000000000000000000000000000000",
+        "mainnet": "0x0000000000000000000000000000000000000000"
+      },
+      "collateralFactor": "700000000000000000",
+      "reserveFactor": "200000000000000000",
+      "borrowCap": "100000000000000000000000", 
+      "initialExchangeRate": "200000000000000000000000000",
+      "initialPrice": "250000000000000000000",
+      "comment": "Collateral: 70%, Reserve: 20%, BorrowCap: 100K TSLA, Price: $250"
+    }
+  }
+}
