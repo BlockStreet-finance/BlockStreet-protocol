@@ -31,7 +31,7 @@ done
 
 # Set network-specific variables
 if [ "$ENVIRONMENT" = "testnet" ]; then
-    NETWORK_FLAG="--rpc-url ${BSC_TESTNET_RPC:-https://data-seed-prebsc-1-s1.binance.org:8545/} --with-gas-price 100000000"
+    NETWORK_FLAG="--rpc-url ${BSC_TESTNET_RPC:-https://data-seed-prebsc-1-s1.binance.org:8545/} --with-gas-price 200000000"
     ETHERSCAN_API_KEY="$BSCSCAN_TESTNET_API_KEY"
     echo "🚀 Deploying to BSC Testnet..."
 elif [ "$ENVIRONMENT" = "mainnet" ]; then

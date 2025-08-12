@@ -358,7 +358,17 @@ contract DeployScript is Script {
 
         // Market contracts
         vm.serializeAddress(addressesJson, "bUSDC", address(bUSDC));
-        addressesJson = vm.serializeAddress(addressesJson, "bTSLA", address(bTSLA));
+        vm.serializeAddress(addressesJson, "bTSLA", address(bTSLA));
+
+        // Test tokens (testnet only)
+        if (block.chainid == 97 || block.chainid == 56) {
+            if (address(mockUSDC) != address(0)) {
+                vm.serializeAddress(addressesJson, "mockUSDC", address(mockUSDC));
+            }
+            if (address(mockTSLA) != address(0)) {
+                addressesJson = vm.serializeAddress(addressesJson, "mockTSLA", address(mockTSLA));
+            }
+        }
 
         console.log("Serialized JSON length:", bytes(addressesJson).length);
 
