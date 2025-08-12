@@ -60,8 +60,8 @@
       "symbol": "bUSDC",
       "decimals": 8,
       "underlying": {
-        "testnet": "0x64544969ed7EBf5f083679233325356EbE738930",
-        "mainnet": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+        "testnet": "0x0000000000000000000000000000000000000000",
+        "mainnet": "0x0000000000000000000000000000000000000000"
       },
       "collateralFactor": "800000000000000000",
       "reserveFactor": "100000000000000000", 
