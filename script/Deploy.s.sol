@@ -75,7 +75,7 @@ contract DeployScript is Script {
         console.log("Admin:", config.admin);
         
         // Deploy test tokens first (testnet only)
-        if (block.chainid == 97 || block.chainid == 56) {
+        if (block.chainid == 97 || block.chainid == 56 || block.chainid == 10143) {
             _deployTestTokens();
         }
         
@@ -105,7 +105,7 @@ contract DeployScript is Script {
     
     function _loadConfig() internal {
         // Determine network
-        if (block.chainid == 97) {
+        if (block.chainid == 97 || block.chainid == 10143) {
             network = "testnet";
         } else if (block.chainid == 56) {
             network = "mainnet";

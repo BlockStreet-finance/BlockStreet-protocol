@@ -31,11 +31,11 @@ done
 
 # Set network-specific variables
 if [ "$ENVIRONMENT" = "testnet" ]; then
-    NETWORK_FLAG="--rpc-url ${BSC_TESTNET_RPC:-https://data-seed-prebsc-1-s1.binance.org:8545/} --with-gas-price 200000000"
+    NETWORK_FLAG="--rpc-url $TESTNET_RPC --with-gas-price 200000000"
     ETHERSCAN_API_KEY="$BSCSCAN_TESTNET_API_KEY"
     echo "🚀 Deploying to BSC Testnet..."
 elif [ "$ENVIRONMENT" = "mainnet" ]; then
-    NETWORK_FLAG="--rpc-url ${BSC_MAINNET_RPC:-https://bsc-dataseed.binance.org/} --with-gas-price 200000000"
+    NETWORK_FLAG="--rpc-url $MAINNET_RPC --with-gas-price 200000000"
     ETHERSCAN_API_KEY="$BSCSCAN_API_KEY"
     echo "🚀 Deploying to BSC Mainnet..."
     echo "⚠️  WARNING: This is MAINNET deployment!"
@@ -79,9 +79,9 @@ DEPLOY_CMD="forge script script/Deploy.s.sol:DeployScript \
 
 if [ "$VERIFY_FLAG" = "--verify" ]; then
   if [ "$ENVIRONMENT" = "testnet" ]; then
-        DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url https://api.etherscan.io/v2/api?chainid=97 --etherscan-api-key $ETHERSCAN_API_KEY"
+        DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url $TESTNET_VERIFY_CONTRACT --etherscan-api-key $ETHERSCAN_API_KEY"
   else
-        DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url https://api.etherscan.io/v2/api?chainid=56 --etherscan-api-key $ETHERSCAN_API_KEY"
+        DEPLOY_CMD="$DEPLOY_CMD --verify --verifier-url $MAINNET_VERIFY_CONTRACT --etherscan-api-key $ETHERSCAN_API_KEY"
   fi
 fi
 
