@@ -42,9 +42,9 @@
     "comment": "closeFactor: 50% (0.5 * 1e18), liquidationIncentive: 108% (1.08 * 1e18)"
   },
   "governance": {
-    "admin": "0x6a5ce9Ff5228cEb2Ab44FA7C44E3619C18d3044e",
-    "pauseGuardian": "0x6a5ce9Ff5228cEb2Ab44FA7C44E3619C18d3044e",
-    "borrowCapGuardian": "0x6a5ce9Ff5228cEb2Ab44FA7C44E3619C18d3044e",
+    "admin": "0x0000000000000000000000000000000000000000",
+    "pauseGuardian": "0x0000000000000000000000000000000000000000",
+    "borrowCapGuardian": "0x0000000000000000000000000000000000000000",
     "comment": "Replace these addresses with your Safe multisig wallet addresses before deployment"
   },
   "interestRateModel": {
