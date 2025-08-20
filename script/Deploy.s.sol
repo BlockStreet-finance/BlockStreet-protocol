@@ -286,8 +286,8 @@ contract DeployScript is Script {
         console.log("Borrow caps set");
         
         // Set reserve factors
-        bUSDC._setReserveFactor(config.usdcMarket.reserveFactor);
-        bTSLA._setReserveFactor(config.tslaMarket.reserveFactor);
+        bUSDC._setReserveFactor{gas: 500000}(config.usdcMarket.reserveFactor);
+        bTSLA._setReserveFactor{gas: 500000}(config.tslaMarket.reserveFactor);
         console.log("Reserve factors set");
         
         // Set initial prices
@@ -361,7 +361,7 @@ contract DeployScript is Script {
         vm.serializeAddress(addressesJson, "bTSLA", address(bTSLA));
 
         // Test tokens (testnet only)
-        if (block.chainid == 97 || block.chainid == 56) {
+        if (block.chainid == 97 || block.chainid == 56 || block.chainid == 10143) {
             if (address(mockUSDC) != address(0)) {
                 vm.serializeAddress(addressesJson, "mockUSDC", address(mockUSDC));
             }
@@ -396,7 +396,7 @@ contract DeployScript is Script {
         console.log("bUSDC:", address(bUSDC));
         console.log("bTSLA:", address(bTSLA));
         
-        if (block.chainid == 97) {
+        if (block.chainid == 97 || block.chainid == 10143) {
             if (address(mockUSDC) != address(0)) {
                 console.log("Mock USDC:", address(mockUSDC));
             }

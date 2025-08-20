@@ -31,11 +31,11 @@ done
 
 # Set network-specific variables
 if [ "$ENVIRONMENT" = "testnet" ]; then
-    NETWORK_FLAG="--rpc-url $TESTNET_RPC --with-gas-price 200000000"
+    NETWORK_FLAG="--rpc-url $TESTNET_RPC --gas-limit 60000000 --gas-price 200000000 "
     ETHERSCAN_API_KEY="$BSCSCAN_TESTNET_API_KEY"
     echo "🚀 Deploying to BSC Testnet..."
 elif [ "$ENVIRONMENT" = "mainnet" ]; then
-    NETWORK_FLAG="--rpc-url $MAINNET_RPC --with-gas-price 200000000"
+    NETWORK_FLAG="--rpc-url $MAINNET_RPC --gas-limit 60000000 --gas-price 200000000 "
     ETHERSCAN_API_KEY="$BSCSCAN_API_KEY"
     echo "🚀 Deploying to BSC Mainnet..."
     echo "⚠️  WARNING: This is MAINNET deployment!"
