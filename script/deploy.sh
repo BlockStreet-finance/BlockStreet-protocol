@@ -8,7 +8,9 @@ set -e
 # Load environment variables
 if [ -f .env ]; then
     echo "Loading environment variables from .env..."
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    source .env
+    set +a
 else
     echo "Error: .env file not found"
     exit 1
